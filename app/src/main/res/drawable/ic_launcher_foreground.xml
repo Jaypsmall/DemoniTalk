@@ -1,0 +1,30 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Shadow -->
+    <path
+        android:fillColor="#44000000"
+        android:pathData="M54,20 L34,10 C26,5 18,18 26,30 L38,45 Q54,95 70,45 L82,30 C90,18 82,5 74,10 L54,20 Z"
+        android:translateX="2"
+        android:translateY="2" />
+
+    <!-- Demon Head (Better proportions) -->
+    <path
+        android:fillColor="#FF3D00"
+        android:pathData="M54,20 L34,10 C26,5 18,18 26,30 L38,45 Q54,95 70,45 L82,30 C90,18 82,5 74,10 L54,20 Z" />
+
+    <!-- Mic Icon (Centered and cleaner) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M49,38 Q49,32 54,32 Q59,32 59,38 L59,52 Q59,57 54,57 Q49,57 49,52 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M45,50 A9,9 0 0 0 63,50 L61,50 A7,7 0 0 1 47,50 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M53,57 L53,63 L49,63 L49,65 L59,65 L59,63 L55,63 L55,57 Z" />
+
+</vector>
