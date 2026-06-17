@@ -12,6 +12,7 @@ class CommandHandler(private val context: Context) {
 
     private val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
     private var cameraId: String? = null
+    private var internalListener: ((String) -> Unit)? = null
 
     init {
         try {
@@ -19,6 +20,10 @@ class CommandHandler(private val context: Context) {
         } catch (e: Exception) {
             Log.e("CommandHandler", "Error getting camera ID", e)
         }
+    }
+
+    fun setInternalListener(listener: (String) -> Unit) {
+        internalListener = listener
     }
 
     private fun String.normalize(): String {
@@ -31,16 +36,19 @@ class CommandHandler(private val context: Context) {
         val normalizedText = text.normalize()
         Log.d("CommandHandler", "Searching for command in: '$normalizedText'")
         
-        // Mejora del motor: Búsqueda por coincidencia más flexible
         val command = commands.find { 
             val trigger = it.trigger.normalize()
-            // Coincidencia exacta o contenida
             normalizedText.contains(trigger) || trigger.contains(normalizedText) ||
-            // Opcional: podrías añadir Levenshtein para errores leves de dictado
             isFuzzyMatch(normalizedText, trigger)
         }
 
         if (command != null) {
+            // Si la acción es interna, la mandamos al listener inmediatamente
+            if (command.action.startsWith("internal_")) {
+                internalListener?.invoke(command.action)
+                return
+            }
+
             Thread {
                 processAction(command.action, command.isRoot)
             }.start()

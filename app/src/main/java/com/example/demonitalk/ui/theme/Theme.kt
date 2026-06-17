@@ -16,8 +16,8 @@ private val DarkColorScheme = darkColorScheme(
     secondary = DeepBlood,
     tertiary = BrimstoneYellow,
     background = AbyssBlack,
-    surface = Obsidian,
-    onPrimary = AbyssBlack,
+    surface = Obsidian,     // Tarjetas oscuras
+    onPrimary = Color.White,
     onSecondary = SoulWhite,
     onTertiary = AbyssBlack,
     onBackground = SoulWhite,
@@ -30,8 +30,8 @@ private val LightColorScheme = lightColorScheme(
     primary = HellRed,
     secondary = Obsidian,
     tertiary = BrimstoneYellow,
-    background = SoulWhite,
-    surface = Color(0xFFE0E0E0), // "Toque de sal": un gris muy claro metálico
+    background = ShinySilver, // Fondo plata para la lista
+    surface = Color.White,    // Tarjetas blancas iluminadas
     onPrimary = Color.White,
     onSecondary = Color.White,
     onBackground = AbyssBlack,
@@ -45,7 +45,7 @@ fun DemoniTalkTheme(
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
     val view = LocalView.current
-    
+
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window

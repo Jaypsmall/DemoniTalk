@@ -15,7 +15,7 @@ class CommandRepository(private val context: Context) {
     }
 
     fun isDarkMode(): Boolean {
-        return prefs.getBoolean(DARK_MODE_KEY, true) // Default to true because it's "Demoni"
+        return prefs.getBoolean(DARK_MODE_KEY, true)
     }
 
     fun saveCommands(commands: List<VoiceCommand>) {
@@ -24,23 +24,44 @@ class CommandRepository(private val context: Context) {
 
     fun loadCommands(): List<VoiceCommand> {
         val json = prefs.getString(COMMANDS_KEY, null)
-        return if (json == null) {
-            listOf(
-                VoiceCommand("cámara", "com.android.camera"),
-                VoiceCommand("reboot", "reboot", true),
-                VoiceCommand("pydroid", "ru.iiec.pydroid3"),
-                VoiceCommand("termux", "com.termux"),
-                VoiceCommand("ajustes", "com.android.settings"),
-                VoiceCommand("hexcolor", "com.psbank.hexcolor"),
-                VoiceCommand("música", "com.google.android.music"),
-                VoiceCommand("encender linterna", "torch_on"),
-                VoiceCommand("apagar linterna", "torch_off"),
-                VoiceCommand("cerrar cámara", "am force-stop com.huawei.camera", true),
-                VoiceCommand("cerrar todo", "input keyevent 187 && sleep 1 && input tap 540 1800", true)
-            )
+        val currentCommands = if (json == null) {
+            getDefaultCommands()
         } else {
             val type = object : TypeToken<List<VoiceCommand>>() {}.type
-            gson.fromJson(json, type)
+            try {
+                gson.fromJson<List<VoiceCommand>>(json, type)
+            } catch (e: Exception) {
+                getDefaultCommands()
+            }
         }
+
+        // Filtramos duplicados por el trigger (palabra mágica)
+        val uniqueCommands = currentCommands.distinctBy { it.trigger.lowercase().trim() }.toMutableList()
+        
+        // Añadimos solo los nuevos que falten realmente
+        val defaults = getDefaultCommands()
+        var modified = false
+        for (default in defaults) {
+            if (uniqueCommands.none { it.trigger.lowercase().trim() == default.trigger.lowercase().trim() }) {
+                uniqueCommands.add(default)
+                modified = true
+            }
+        }
+
+        if (modified) saveCommands(uniqueCommands)
+        return uniqueCommands
+    }
+
+    private fun getDefaultCommands(): List<VoiceCommand> {
+        return listOf(
+            VoiceCommand("cámara", "com.android.camera"),
+            VoiceCommand("reboot", "reboot", true),
+            VoiceCommand("ajustes", "com.android.settings"),
+            VoiceCommand("activar escucha", "internal_continuous_on"),
+            VoiceCommand("desactivar escucha", "internal_continuous_off"),
+            VoiceCommand("encender foco", "torch_on"),
+            VoiceCommand("apagar foco", "torch_off"),
+            VoiceCommand("cerrar todo", "input keyevent 187 && sleep 1 && input tap 540 1800", true)
+        )
     }
 }
