@@ -9,6 +9,7 @@ class CommandRepository(private val context: Context) {
     private val prefs = context.getSharedPreferences("DemoniTalkPrefs", Context.MODE_PRIVATE)
     private val COMMANDS_KEY = "commands"
     private val DARK_MODE_KEY = "dark_mode"
+    private val EXPORT_PATH_KEY = "export_path"
 
     fun saveDarkMode(enabled: Boolean) {
         prefs.edit().putBoolean(DARK_MODE_KEY, enabled).apply()
@@ -16,6 +17,14 @@ class CommandRepository(private val context: Context) {
 
     fun isDarkMode(): Boolean {
         return prefs.getBoolean(DARK_MODE_KEY, true)
+    }
+
+    fun saveExportPath(path: String) {
+        prefs.edit().putString(EXPORT_PATH_KEY, path).apply()
+    }
+
+    fun getExportPath(): String {
+        return prefs.getString(EXPORT_PATH_KEY, "") ?: ""
     }
 
     fun saveCommands(commands: List<VoiceCommand>) {
