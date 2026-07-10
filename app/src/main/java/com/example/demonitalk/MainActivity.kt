@@ -15,6 +15,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -217,7 +218,7 @@ class MainActivity : ComponentActivity() {
                     Column {
                         TopAppBar(
                             colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = MaterialTheme.colorScheme.background,
+                                containerColor = if (isDarkMode) MaterialTheme.colorScheme.background else Color.White,
                                 navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
                                 titleContentColor = MaterialTheme.colorScheme.onSurface,
                                 actionIconContentColor = MaterialTheme.colorScheme.onSurface
@@ -545,20 +546,24 @@ class MainActivity : ComponentActivity() {
         onDelete: () -> Unit,
         onEdit: () -> Unit
     ) {
+        val isDark = MaterialTheme.colorScheme.background.let { it.red + it.green + it.blue < 1.0f }
+        
         Card(
             modifier = modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 6.dp)
-                .shadow(8.dp, shape = RoundedCornerShape(16.dp))
-                .border(
-                    width = 1.dp, 
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(16.dp)
-                ),
-            shape = RoundedCornerShape(16.dp),
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(
-                containerColor = if (MaterialTheme.colorScheme.background.let { it.red + it.green + it.blue < 1.0f }) 
-                    Color(0xFF1A1A1A) else Color.White.copy(alpha = 0.9f)
+                containerColor = if (isDark) Color(0xFF1A1A1A) else Color.White,
+                contentColor = MaterialTheme.colorScheme.onSurface
+            ),
+            elevation = CardDefaults.cardElevation(
+                defaultElevation = 6.dp,
+                pressedElevation = 2.dp
+            ),
+            border = BorderStroke(
+                width = 1.dp, 
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
             ),
             onClick = onEdit
         ) {
