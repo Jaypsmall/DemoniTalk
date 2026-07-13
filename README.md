@@ -39,3 +39,6 @@ Herramienta avanzada de control de sistema protegida bajo propiedad intelectual 
   <img src="https://github.com/user-attachments/assets/a17f967a-f317-4bd5-bbbe-c3267ca96bf1" width="30%" />
   <img src="https://github.com/user-attachments/assets/9be6a92b-b8c9-4204-9fe3-49fd2b3567fa" width="30%" />  
 </p>
+
+![Kotlin](https://img.shields.io/badge/kotlin-%237F52FF.svg?style=flat&logo=kotlin&logoColor=white)
+![Android](https://img.shields.io/badge/Android-3DDC84?style=flat&logo=android&logoColor=white)
