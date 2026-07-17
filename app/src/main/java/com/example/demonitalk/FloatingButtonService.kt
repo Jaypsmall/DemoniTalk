@@ -216,6 +216,7 @@ class FloatingButtonService : Service() {
             override fun onError(error: Int) {
                 isListening = false
                 muteAudio(false)
+                android.util.Log.e("DemoniTalk", "Speech Error: $error")
                 if (isContinuousMode) {
                     android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                         if (isContinuousMode) startListening()
@@ -229,6 +230,7 @@ class FloatingButtonService : Service() {
                 muteAudio(false)
                 val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 if (!matches.isNullOrEmpty()) {
+                    android.util.Log.d("DemoniTalk", "Recognized: ${matches[0]}")
                     commandHandler.execute(matches[0], repository.loadCommands())
                 }
                 if (isContinuousMode) {

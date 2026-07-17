@@ -49,8 +49,10 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
+import com.example.demonitalk.ui.theme.AshGrey
 import com.example.demonitalk.ui.theme.DemoniPurple
 import com.example.demonitalk.ui.theme.DemoniTalkTheme
 import com.google.gson.reflect.TypeToken
@@ -107,6 +109,7 @@ class MainActivity : ComponentActivity() {
         var editingCommand by remember { mutableStateOf<VoiceCommand?>(null) }
         var showSuccessDialog by remember { mutableStateOf(false) }
         var showSettingsDialog by remember { mutableStateOf(false) }
+        var isEnglish by remember { mutableStateOf(false) }
         
         val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
         val scope = rememberCoroutineScope()
@@ -183,32 +186,47 @@ class MainActivity : ComponentActivity() {
                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                         )
                         
-                        DrawerButton(text = "Ajustes", icon = Icons.Default.Menu) { 
+                        DrawerButton(text = if (isEnglish) "Settings" else "Ajustes", icon = Icons.Default.Menu) { 
                             showSettingsDialog = true
                             scope.launch { drawerState.close() }
                         }
                         Spacer(modifier = Modifier.height(16.dp))
-                        DrawerButton(text = "Idiomas", icon = Icons.Default.Menu) { /* TODO */ }
+                        DrawerButton(text = if (isEnglish) "Languages" else "Idiomas", icon = Icons.Default.Menu) { 
+                            isEnglish = !isEnglish
+                        }
                         Spacer(modifier = Modifier.height(16.dp))
-                        DrawerButton(text = "Importar", icon = Icons.Default.Upload) {
+                        DrawerButton(text = if (isEnglish) "Import" else "Importar", icon = Icons.Default.Upload) {
                             importLauncher.launch("application/json")
                             scope.launch { drawerState.close() }
                         }
                         Spacer(modifier = Modifier.height(16.dp))
-                        DrawerButton(text = "Exportar", icon = Icons.Default.Download) { 
+                        DrawerButton(text = if (isEnglish) "Export" else "Exportar", icon = Icons.Default.Download) { 
                             exportCommands { showSuccessDialog = true }
                             scope.launch { drawerState.close() }
                         }
                         Spacer(modifier = Modifier.height(16.dp))
-                        DrawerButton(text = "Ayuda", icon = Icons.Default.Menu) { /* TODO */ }
+                        DrawerButton(text = if (isEnglish) "Help" else "Ayuda", icon = Icons.Default.Menu) { /* TODO */ }
                         
                         Spacer(modifier = Modifier.weight(1f))
                         
-                        Text(
-                            text = "v1.0 - Edición Demoniaca",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                        )
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp), 
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "DemoniTalk v1.0.1", 
+                                fontSize = 12.sp, 
+                                fontWeight = FontWeight.Bold, 
+                                color = AshGrey
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Created by JAYLIZ with ❤️", 
+                                fontSize = 9.sp, 
+                                color = AshGrey.copy(0.7f), 
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
                 }
             }
@@ -283,12 +301,12 @@ class MainActivity : ComponentActivity() {
                         .background(MaterialTheme.colorScheme.background) // Negro en oscuro, Plata brillante en claro
                 ) {
                     DemoniButton(
-                        text = "Iniciar Botón Flotante",
+                        text = if (isEnglish) "Start Floating Button" else "Iniciar Botón Flotante",
                         onClick = { startFloatingService() }
                     )
 
                     DemoniButton(
-                        text = "Solicitar Acceso Root",
+                        text = if (isEnglish) "Request Root Access" else "Solicitar Acceso Root",
                         containerColor = MaterialTheme.colorScheme.error,
                         onClick = { requestRoot() }
                     )
@@ -354,27 +372,27 @@ class MainActivity : ComponentActivity() {
 
                 // Diálogo de Éxito al Exportar
                 if (showSuccessDialog) {
-                    SuccessDialog(onDismiss = { showSuccessDialog = false })
+                    SuccessDialog(onDismiss = { showSuccessDialog = false }, isEnglish = isEnglish)
                 }
 
                 if (showSettingsDialog) {
-                    SettingsDialog(onDismiss = { showSettingsDialog = false })
+                    SettingsDialog(onDismiss = { showSettingsDialog = false }, isEnglish = isEnglish)
                 }
             }
         }
     }
 
     @Composable
-    fun SettingsDialog(onDismiss: () -> Unit) {
+    fun SettingsDialog(onDismiss: () -> Unit, isEnglish: Boolean) {
         var path by remember { mutableStateOf(repository.getExportPath()) }
 
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("Configuración ⚙️", style = MaterialTheme.typography.titleLarge) },
+            title = { Text(if (isEnglish) "Settings ⚙️" else "Configuración ⚙️", style = MaterialTheme.typography.titleLarge) },
             text = {
                 Column {
                     Text(
-                        text = "Ruta de Exportación Custom",
+                        text = if (isEnglish) "Custom Export Path" else "Ruta de Exportación Custom",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
@@ -382,11 +400,11 @@ class MainActivity : ComponentActivity() {
                     TextField(
                         value = path,
                         onValueChange = { path = it },
-                        placeholder = { Text("Ej: /storage/emulated/0/Download") },
+                        placeholder = { Text(if (isEnglish) "e.g. /storage/emulated/0/Download" else "Ej: /storage/emulated/0/Download") },
                         modifier = Modifier.fillMaxWidth()
                     )
                     Text(
-                        text = "Si se deja vacío, usará Descargas por defecto.",
+                        text = if (isEnglish) "If left empty, it will use Downloads by default." else "Si se deja vacío, usará Descargas por defecto.",
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(top = 4.dp)
                     )
@@ -397,19 +415,19 @@ class MainActivity : ComponentActivity() {
                     repository.saveExportPath(path)
                     onDismiss()
                 }) {
-                    Text("GUARDAR")
+                    Text(if (isEnglish) "SAVE" else "GUARDAR")
                 }
             },
             dismissButton = {
                 TextButton(onClick = onDismiss) {
-                    Text("CANCELAR")
+                    Text(if (isEnglish) "CANCEL" else "CANCELAR")
                 }
             }
         )
     }
 
     @Composable
-    fun SuccessDialog(onDismiss: () -> Unit) {
+    fun SuccessDialog(onDismiss: () -> Unit, isEnglish: Boolean) {
         Dialog(onDismissRequest = onDismiss) {
             Card(
                 modifier = Modifier
@@ -440,7 +458,7 @@ class MainActivity : ComponentActivity() {
                     }
                     Spacer(modifier = Modifier.height(24.dp))
                     Text(
-                        text = "ENTRADAS GUARDADAS",
+                        text = if (isEnglish) "ENTRIES SAVED" else "ENTRADAS GUARDADAS",
                         style = MaterialTheme.typography.headlineSmall.copy(
                             fontWeight = FontWeight.ExtraBold,
                             shadow = Shadow(color = Color.Black.copy(alpha = 0.3f), offset = Offset(2f, 2f), blurRadius = 4f)
@@ -449,13 +467,13 @@ class MainActivity : ComponentActivity() {
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "Tu configuración ha sido exportada con éxito a la carpeta de Descargas.",
+                        text = if (isEnglish) "Your configuration has been successfully exported to the Downloads folder." else "Tu configuración ha sido exportada con éxito a la carpeta de Descargas.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(32.dp))
-                    DemoniButton(text = "ACEPTAR", onClick = onDismiss)
+                    DemoniButton(text = if (isEnglish) "ACCEPT" else "ACEPTAR", onClick = onDismiss)
                 }
             }
         }
