@@ -1,35 +1,35 @@
-# 😈 DemoniTalk (v1.0 - Edición Demoníaca)
+# 😈 DemoniTalk (v1.0 - Demonic Edition)
 
-DemoniTalk es un asistente de voz y motor de automatización avanzado para Android que requiere privilegios de Root. Permite mapear comandos de voz personalizados ("Triggers") para ejecutar de forma instantánea scripts de consola, macros de simulación táctil y control de procesos del sistema a bajo nivel mediante una interfaz flotante.
-
----
-
-## ✨ Características Principales
-
-* **🎙️ Asistente de Voz Inteligente:** Módulo de escucha integrado mediante un botón flotante interactivo (Overlay) que se ejecuta sobre cualquier aplicación o juego.
-* **⚡ Automatización por Root (Triggers personalizados):**
-    * **Control de Procesos:** Cierre forzado inmediato de cualquier aplicación (`am force-stop`) o eliminación de tareas por PID.
-    * **Simulación Táctil Interactiva:** Creación de macros complejas encadenando coordenadas de pulsación (`input tap`), deslizamientos (`input swipe`) y temporizadores (`sleep`).
-    * **Inyección de Keyevents:** Ejecución de acciones nativas del sistema como el botón atrás, inicio o aplicaciones recientes a través de comandos de consola.
-* **🔄 Modos de Captura Dinámicos:**
-    * **Modo Continuo:** El asistente se mantiene en escucha activa permanente esperando órdenes de voz encadenadas.
-    * **Modo Manual:** Activación por pulsación para optimizar el consumo de recursos y batería.
-* **🎨 Interfaz "Edición Demoníaca":** Diseño oscuro agresivo y limpio con soporte para temas (Modo Claro/Oscuro), gestión de diccionarios de comandos (Importar/Exportar configuraciones) y alertas visuales dinámicas.
+DemoniTalk is an advanced voice assistant and automation engine for Android that requires root privileges. It allows you to map custom voice commands ("Triggers") to instantly execute console scripts, touch simulation macros, and low-level system process controls via a floating interface.
 
 ---
 
-## 🛠️ Stack Técnico y Requisitos
+## ✨ Key Features
 
-* **Infraestructura:** Requiere acceso completo de Superusuario (Magisk / KernelSU) para la inyección de comandos en la terminal de Android.
-* **Servicios de Accesibilidad / Ventana:** Permiso de superposición en pantalla para desplegar el widget del micrófono flotante en tiempo real.
-* **Ecosistema:** Incluye un parser personalizado para importar y exportar tus listas de macros en archivos de configuración locales.
+* **🎙️ Intelligent Voice Assistant:** Integrated listening module via an interactive floating button (overlay) that runs over any app or game.
+* **⚡ Root-Powered Automation (Custom Triggers):**
+    * **Process Control:** Immediate force-stop of any app (`am force-stop`) or task termination by PID.
+    * **Interactive Touch Simulation:** Creation of complex macros by chaining tap coordinates (`input tap`), swipes (`input swipe`), and timers (`sleep`).
+    * **Keyevent Injection:** Execution of native system actions—such as Back, Home, or Recent Apps—via console commands.
+* **🔄 Dynamic Capture Modes:**
+    * **Continuous Mode:** The assistant remains in a state of active listening, waiting for chained voice commands.
+    * **Manual Mode:** Push-to-activate functionality to optimize resource and battery usage.
+* **🎨 "Demonic Edition" Interface:** Aggressive yet clean dark design with theme support (Light/Dark Mode), command dictionary management (Import/Export configurations), and dynamic visual alerts.
 
 ---
 
-## 📄 Licencia
+## 🛠️ Technical Stack & Requirements
 
-Copyright © 2026. Todos los derechos reservados.
-Herramienta avanzada de control de sistema protegida bajo propiedad intelectual privada. Queda totalmente prohibida su copia, modificación o ingeniería inversa no autorizada.
+* **Infrastructure:** Requires full Superuser access (Magisk / KernelSU) for command injection into the Android terminal.
+* **Accessibility / Window Services:** Screen overlay permission to display the floating microphone widget in real-time.
+* **Ecosystem:** Includes a custom parser to import and export your macro lists via local configuration files. ---
+
+## 📄 License and Copyright
+
+Copyright © 2026. All rights reserved. The source code of this application is the private property of the developer. Unauthorized reproduction, distribution, or modification of this software is prohibited.
+
+*Developed with 🧡 by an independent developer.*
+
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/e728adac-3cd9-4ed4-9d7b-88f2da9cca68" width="30%" />
