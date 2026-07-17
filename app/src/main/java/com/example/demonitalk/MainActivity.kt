@@ -62,6 +62,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStreamReader
+import androidx.core.net.toUri
 
 class MainActivity : ComponentActivity() {
 
@@ -90,7 +91,8 @@ class MainActivity : ComponentActivity() {
         }
 
         if (!Settings.canDrawOverlays(this)) {
-            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
+            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                "package:$packageName".toUri())
             startActivity(intent)
         }
     }
