@@ -214,7 +214,7 @@ class MainActivity : ComponentActivity() {
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "DemoniTalk v1.0.1", 
+                                text = "DemoniTalk v1.0.2",
                                 fontSize = 12.sp, 
                                 fontWeight = FontWeight.Bold, 
                                 color = AshGrey
