@@ -36,8 +36,8 @@ Copyright © 2026. All rights reserved. The source code of this application is t
   <img src="https://github.com/user-attachments/assets/1feaade7-f9d6-4ce1-8829-be88116456e5" width="30%" />
 </p>
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/a17f967a-f317-4bd5-bbbe-c3267ca96bf1" width="30%" />
-  <img src="https://github.com/user-attachments/assets/9be6a92b-b8c9-4204-9fe3-49fd2b3567fa" width="30%" />  
+  <img src="https://github.com/user-attachments/assets/85741729-884d-4b14-8111-38ef63084380" width="30%" />
+  <img src="https://github.com/user-attachments/assets/48a53de2-e572-4c50-a761-2409a387336b" width="30%" />  
 </p>
 
 ![Kotlin](https://img.shields.io/badge/kotlin-%237F52FF.svg?style=flat&logo=kotlin&logoColor=white)
