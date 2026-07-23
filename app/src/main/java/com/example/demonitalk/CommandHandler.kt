@@ -32,10 +32,25 @@ class CommandHandler(private val context: Context) {
         return pattern.matcher(nfdNormalizedString).replaceAll("").lowercase().trim()
     }
 
-    private val wakeWords = listOf("hola", "demoni", "demonio", "me money", "de moni", "de mony", "the moni", "demon", "demonia")
+    private val wakeWords: List<String>
+        get() = listOf(
+            "Hex",
+            "dice",
+            "amigo",
+            "ex",
+            "puta",
+            "maquina",
+            "p***",
+            "demoni",
+            "demonio",
+            "me money",
+            "de moni",
+            "de mony",
+            "the moni",
+            )
 
     fun execute(text: String, commands: List<VoiceCommand>, requireWakeWord: Boolean = false): CommandResult {
-        var normalizedText = text.normalize()
+        var normalizedText: String = text.normalize()
         var wakeWordDetected = false
         
         if (requireWakeWord) {
@@ -64,7 +79,7 @@ class CommandHandler(private val context: Context) {
             isFuzzyMatch(normalizedText, trigger)
         }
 
-        return if (command != null) {
+        return (if (command != null) {
             if (command.action.startsWith("internal_")) {
                 internalListener?.invoke(command.action)
             } else {
@@ -72,9 +87,8 @@ class CommandHandler(private val context: Context) {
             }
             CommandResult.Executed
         } else {
-            Log.d("CommandHandler", "No command found for: $normalizedText")
-            if (wakeWordDetected) CommandResult.WakeWordFoundButNoCommand else CommandResult.Ignored
-        }
+
+        }) as CommandResult
     }
 
     enum class CommandResult {

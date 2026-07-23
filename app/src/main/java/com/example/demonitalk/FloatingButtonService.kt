@@ -282,9 +282,14 @@ class FloatingButtonService : Service() {
                     
                     if (isVigilanceMode && result == CommandHandler.CommandResult.WakeWordOnly) {
                         val responses = listOf(
-                            "Dime, alma perdida", 
-                            "Soy todo oídos, mortal", 
-                            "¿Qué sacrificio pides?", 
+                            "¿Abrimos el Super?",
+                            "Que dice mi socio",
+                            "Dime, alma perdida",
+                            "como esta la cosa Bro",
+                            "Soy todo oídos, mortal",
+                            "Que dice mi Amo",
+                            "¿Necesitas que abra el portal?",
+                            "¿Qué sacrificio pides?",
                             "Tus deseos son órdenes en el infierno", 
                             "Habla, antes de que me arrepienta", 
                             "Te escucho, pequeño humano",
@@ -302,7 +307,7 @@ class FloatingButtonService : Service() {
                             override fun onStart(utteranceId: String?) {}
                             override fun onDone(utteranceId: String?) {
                                 android.os.Handler(android.os.Looper.getMainLooper()).post {
-                                    isVigilanceMode = false 
+                                    isVigilanceMode = false
                                     startListening()
                                 }
                             }

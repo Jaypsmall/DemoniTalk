@@ -440,12 +440,7 @@ class MainActivity : ComponentActivity() {
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    TextField(
-                        value = path,
-                        onValueChange = { path = it },
-                        placeholder = { Text(if (isEnglish) "e.g. /storage/emulated/0/Download" else "Ej: /storage/emulated/0/Download") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    TextField(value = path, onValueChange = { path = it }, placeholder = { Text(if (isEnglish) "e.g. /storage/emulated/0/Download" else "Ej: /storage/emulated/0/Download") }, modifier = Modifier.fillMaxWidth())
                     Text(
                         text = if (isEnglish) "If left empty, it will use Downloads by default." else "Si se deja vacío, usará Descargas por defecto.",
                         style = MaterialTheme.typography.labelSmall,
