@@ -260,13 +260,13 @@ class MainActivity : ComponentActivity() {
                                 text = "DemoniTalk v1.0.2",
                                 fontSize = 12.sp, 
                                 fontWeight = FontWeight.Bold, 
-                                color = AshGrey
+                                color = if (isDarkMode) AshGrey else Color.DarkGray
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = "Created by JAYLIZ with ❤️", 
                                 fontSize = 9.sp, 
-                                color = AshGrey.copy(0.7f), 
+                                color = (if (isDarkMode) AshGrey else Color.DarkGray).copy(0.7f),
                                 fontWeight = FontWeight.Medium
                             )
                         }
@@ -279,7 +279,7 @@ class MainActivity : ComponentActivity() {
                     Column {
                         TopAppBar(
                             colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = if (isDarkMode) MaterialTheme.colorScheme.background else Color.White,
+                                containerColor = MaterialTheme.colorScheme.background,
                                 navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
                                 titleContentColor = MaterialTheme.colorScheme.onSurface,
                                 actionIconContentColor = MaterialTheme.colorScheme.onSurface

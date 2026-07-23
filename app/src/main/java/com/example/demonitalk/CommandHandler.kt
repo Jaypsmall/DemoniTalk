@@ -32,29 +32,56 @@ class CommandHandler(private val context: Context) {
         return pattern.matcher(nfdNormalizedString).replaceAll("").lowercase().trim()
     }
 
-    fun execute(text: String, commands: List<VoiceCommand>) {
-        val normalizedText = text.normalize()
+    private val wakeWords = listOf("hola", "demoni", "demonio", "me money", "de moni", "de mony", "the moni", "demon", "demonia")
+
+    fun execute(text: String, commands: List<VoiceCommand>, requireWakeWord: Boolean = false): CommandResult {
+        var normalizedText = text.normalize()
+        var wakeWordDetected = false
+        
+        if (requireWakeWord) {
+            val foundWakeWord = wakeWords.find { normalizedText.startsWith(it) }
+            if (foundWakeWord != null) {
+                wakeWordDetected = true
+                // Quitamos la palabra de activación encontrada
+                normalizedText = normalizedText.removePrefix(foundWakeWord).trim()
+                Log.d("CommandHandler", "Wake-word '$foundWakeWord' detected! Remaining: '$normalizedText'")
+            } else {
+                Log.d("CommandHandler", "Wake-word not found in vigilance mode.")
+                return CommandResult.Ignored
+            }
+        }
+
+        // Si solo se dijo la palabra mágica sin nada más
+        if (wakeWordDetected && normalizedText.isEmpty()) {
+            return CommandResult.WakeWordOnly
+        }
+
         Log.d("CommandHandler", "Searching for command in: '$normalizedText'")
         
         val command = commands.find { 
             val trigger = it.trigger.normalize()
-            normalizedText.contains(trigger) || trigger.contains(normalizedText) ||
+            normalizedText == trigger || normalizedText.contains(trigger) || trigger.contains(normalizedText) ||
             isFuzzyMatch(normalizedText, trigger)
         }
 
-        if (command != null) {
-            // Si la acción es interna, la mandamos al listener inmediatamente
+        return if (command != null) {
             if (command.action.startsWith("internal_")) {
                 internalListener?.invoke(command.action)
-                return
+            } else {
+                Thread { processAction(command.action, command.isRoot) }.start()
             }
-
-            Thread {
-                processAction(command.action, command.isRoot)
-            }.start()
+            CommandResult.Executed
         } else {
-            Log.d("CommandHandler", "No command found for: $text")
+            Log.d("CommandHandler", "No command found for: $normalizedText")
+            if (wakeWordDetected) CommandResult.WakeWordFoundButNoCommand else CommandResult.Ignored
         }
+    }
+
+    enum class CommandResult {
+        Ignored,            // No se detectó nada relevante
+        WakeWordOnly,       // Se dijo "Demoni" pero nada más
+        Executed,           // Se ejecutó un comando (directo o tras wake-word)
+        WakeWordFoundButNoCommand // Se dijo "Demoni algo" pero ese "algo" no es un comando
     }
 
     private fun isFuzzyMatch(text: String, trigger: String): Boolean {
