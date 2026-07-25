@@ -39,14 +39,7 @@ class CommandHandler(private val context: Context) {
             "amigo",
             "ex",
             "puta",
-            "maquina",
-            "p***",
-            "demoni",
-            "demonio",
-            "me money",
-            "de moni",
-            "de mony",
-            "the moni",
+            "maquina"
             )
 
     fun execute(text: String, commands: List<VoiceCommand>, requireWakeWord: Boolean = false): CommandResult {
@@ -95,7 +88,6 @@ class CommandHandler(private val context: Context) {
         Ignored,            // No se detectó nada relevante
         WakeWordOnly,       // Se dijo "Demoni" pero nada más
         Executed,           // Se ejecutó un comando (directo o tras wake-word)
-        WakeWordFoundButNoCommand // Se dijo "Demoni algo" pero ese "algo" no es un comando
     }
 
     private fun isFuzzyMatch(text: String, trigger: String): Boolean {

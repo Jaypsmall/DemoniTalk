@@ -3,6 +3,7 @@ package com.example.demonitalk
 import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import java.io.File
 
 class CommandRepository(private val context: Context) {
     private val gson = Gson()
@@ -29,6 +30,20 @@ class CommandRepository(private val context: Context) {
 
     fun saveCommands(commands: List<VoiceCommand>) {
         prefs.edit().putString(COMMANDS_KEY, gson.toJson(commands)).apply()
+    }
+
+    fun clearCache() {
+        prefs.edit().remove(COMMANDS_KEY).apply()
+    }
+
+    fun getBackupFiles(): List<File> {
+        val customPath = getExportPath().trim()
+        val dir = if (customPath.isNotEmpty()) {
+            File(customPath)
+        } else {
+            android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+        }
+        return dir.listFiles { _, name -> name.endsWith(".json") && name.startsWith("DemoniTalk_Backup_") }?.toList() ?: emptyList<File>()
     }
 
     fun loadCommands(): List<VoiceCommand> {

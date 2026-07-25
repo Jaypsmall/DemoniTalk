@@ -21,6 +21,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -45,6 +47,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.NightsStay
@@ -152,6 +155,7 @@ class MainActivity : ComponentActivity() {
         var editingCommand by remember { mutableStateOf<VoiceCommand?>(null) }
         var showSuccessDialog by remember { mutableStateOf(false) }
         var showSettingsDialog by remember { mutableStateOf(false) }
+        var showStorageDialog by remember { mutableStateOf(false) }
         var isEnglish by remember { mutableStateOf(false) }
         
         val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -215,6 +219,7 @@ class MainActivity : ComponentActivity() {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
                             .padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -248,6 +253,11 @@ class MainActivity : ComponentActivity() {
                             scope.launch { drawerState.close() }
                         }
                         Spacer(modifier = Modifier.height(16.dp))
+                        DrawerButton(text = if (isEnglish) "Storage" else "Almacenamiento", icon = Icons.Default.Menu) { 
+                            showStorageDialog = true
+                            scope.launch { drawerState.close() }
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
                         DrawerButton(text = if (isEnglish) "Help" else "Ayuda", icon = Icons.Default.Menu) { /* TODO */ }
                         
                         Spacer(modifier = Modifier.weight(1f))
@@ -257,7 +267,7 @@ class MainActivity : ComponentActivity() {
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "DemoniTalk v1.0.2",
+                                text = "DemoniTalk v1.0.3",
                                 fontSize = 12.sp, 
                                 fontWeight = FontWeight.Bold, 
                                 color = if (isDarkMode) AshGrey else Color.DarkGray
@@ -421,8 +431,96 @@ class MainActivity : ComponentActivity() {
                 if (showSettingsDialog) {
                     SettingsDialog(onDismiss = { showSettingsDialog = false }, isEnglish = isEnglish)
                 }
+
+                if (showStorageDialog) {
+                    StorageDialog(
+                        onDismiss = { showStorageDialog = false },
+                        isEnglish = isEnglish,
+                        onCommandsUpdated = { commands = it }
+                    )
+                }
             }
         }
+    }
+
+    @Composable
+    fun StorageDialog(onDismiss: () -> Unit, isEnglish: Boolean, onCommandsUpdated: (List<VoiceCommand>) -> Unit) {
+        var files by remember { mutableStateOf(repository.getBackupFiles()) }
+        val currentCommandsCount = repository.loadCommands().size
+
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(if (isEnglish) "Storage Management 📦" else "Gestión de Datos 📦", style = MaterialTheme.typography.titleLarge) },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(if (isEnglish) "Internal Cache" else "Caché Interna", fontWeight = FontWeight.Bold)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isEnglish) "Saved commands: $currentCommandsCount" else "Comandos guardados: $currentCommandsCount",
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        IconButton(onClick = { 
+                            repository.clearCache()
+                            onCommandsUpdated(repository.loadCommands())
+                            onDismiss()
+                            Toast.makeText(this@MainActivity, if (isEnglish) "Cache cleared!" else "¡Caché limpiada!", Toast.LENGTH_SHORT).show()
+                        }) {
+                            Icon(Icons.Default.DeleteForever, "Clear Cache", tint = Color.Red)
+                        }
+                    }
+                    
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                    
+                    Text(if (isEnglish) "Backups (.json)" else "Respaldos en Carpeta (.json)", fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    if (files.isEmpty()) {
+                        Text(
+                            text = if (isEnglish) "No backups found." else "No se encontraron respaldos.",
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    } else {
+                        LazyColumn(modifier = Modifier.heightIn(max = 250.dp)) {
+                            items(files) { file ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.Download, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = file.name, 
+                                        fontSize = 10.sp, 
+                                        modifier = Modifier.weight(1f),
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                    )
+                                    IconButton(
+                                        onClick = { 
+                                            file.delete()
+                                            files = repository.getBackupFiles()
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(Icons.Default.Delete, "Delete File", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = onDismiss) {
+                    Text(if (isEnglish) "CLOSE" else "CERRAR")
+                }
+            }
+        )
     }
 
     @Composable
