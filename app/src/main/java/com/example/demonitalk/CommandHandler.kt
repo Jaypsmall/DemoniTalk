@@ -29,7 +29,12 @@ class CommandHandler(private val context: Context) {
     private fun String.normalize(): String {
         val nfdNormalizedString = Normalizer.normalize(this, Normalizer.Form.NFD)
         val pattern = Pattern.compile("\\p{InCombiningDiacriticalMarks}+")
-        return pattern.matcher(nfdNormalizedString).replaceAll("").lowercase().trim()
+        val base = pattern.matcher(nfdNormalizedString).replaceAll("").lowercase().trim()
+        
+        // Mapeamos las palabras solicitadas a "maquina" para estandarizar el wake-word
+        return base.replace("demonio", "maquina")
+            .replace("demoni", "maquina")
+            .replace("puta", "maquina")
     }
 
     private val wakeWords: List<String>
@@ -38,7 +43,6 @@ class CommandHandler(private val context: Context) {
             "dice",
             "amigo",
             "ex",
-            "puta",
             "maquina"
             )
 

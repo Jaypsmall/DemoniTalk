@@ -5,9 +5,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
-import android.content.Context
 import android.content.Intent
-import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.media.AudioManager
 import android.os.Build
@@ -44,7 +42,7 @@ class FloatingButtonService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    @SuppressLint("InflateParams")
+    @SuppressLint("InflateParams", "ClickableViewAccessibility")
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
@@ -86,16 +84,14 @@ class FloatingButtonService : Service() {
         )
 
         params.gravity = Gravity.TOP or Gravity.START
-        // --- AQUÍ CAMBIAS LAS COORDENADAS ---
-        params.x = 460 // Distancia desde la izquierda
-        params.y = 948 // Distancia desde arriba
-        // -------------------------------------
+        params.x = 460
+        params.y = 948
 
         windowManager.addView(floatingView, params)
         setupSpeechRecognizer()
 
-        val micButton = floatingView.findViewById<ImageView>(R.id.mic_button).also {
-            it.setOnTouchListener(object : View.OnTouchListener {
+        floatingView.findViewById<ImageView>(R.id.mic_button).also { btn ->
+            btn.setOnTouchListener(object : View.OnTouchListener {
                 private var initialX: Int = 0
                 private var initialY: Int = 0
                 private var initialTouchX: Float = 0.0f
@@ -105,24 +101,22 @@ class FloatingButtonService : Service() {
                 private val handler = android.os.Handler(android.os.Looper.getMainLooper())
 
                 private val processClicksRunnable = Runnable {
+                    val mBtn = floatingView.findViewById<ImageView>(R.id.mic_button)
                     when (clickCount) {
-                        1 -> { // MODO MANUAL (AMARILLO)
+                        1 -> {
                             isContinuousMode = false
                             isVigilanceMode = false
+                            mBtn.setBackgroundResource(R.drawable.bg_floating_button_active)
                             startListening()
                         }
-                        2 -> { // MODO VIGILANCIA (AZUL - "DEMONI")
-                            toggleVigilanceMode(it)
-                        }
-                        3 -> { // MODO CONTINUO (VERDE)
-                            toggleContinuousMode(it)
-                        }
+                        2 -> toggleVigilanceMode(mBtn)
+                        3 -> toggleContinuousMode(mBtn)
                         4 -> {
                             val intent = Intent(this@FloatingButtonService, MainActivity::class.java)
                             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             startActivity(intent)
                         }
-                        5 -> { stopSelf() }
+                        5 -> stopSelf()
                     }
                     clickCount = 0
                 }
@@ -180,11 +174,7 @@ class FloatingButtonService : Service() {
             .setSilent(true)
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .build()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
-        }
+        startForeground(NOTIFICATION_ID, notification)
     }
 
     private fun muteAudio(mute: Boolean) {
@@ -237,7 +227,12 @@ class FloatingButtonService : Service() {
     }
 
     private fun setupSpeechRecognizer() {
-        if (::speechRecognizer.isInitialized) speechRecognizer.destroy()
+        if (::speechRecognizer.isInitialized) {
+            try {
+                speechRecognizer.cancel()
+                speechRecognizer.destroy()
+            } catch (e: Exception) { }
+        }
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
         speechRecognizer.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {
@@ -248,6 +243,9 @@ class FloatingButtonService : Service() {
                     isVigilanceMode -> micButton.setBackgroundResource(R.drawable.bg_floating_button_vigilance)
                     isContinuousMode -> micButton.setBackgroundResource(R.drawable.bg_floating_button_continuous)
                     else -> micButton.setBackgroundResource(R.drawable.bg_floating_button_active)
+                }
+                if (!isContinuousMode && !isVigilanceMode) {
+                    Toast.makeText(this@FloatingButtonService, "Escuchando... 🎤", Toast.LENGTH_SHORT).show()
                 }
             }
             override fun onBeginningOfSpeech() {}
@@ -298,21 +296,35 @@ class FloatingButtonService : Service() {
                         )
                         val response = responses.random()
                         
-                        // Aseguramos volumen para oír la respuesta
                         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC), 0)
                         
+                        val fallbackHandler = android.os.Handler(android.os.Looper.getMainLooper())
+                        val fallbackRunnable = Runnable {
+                            if (!isListening) {
+                                isVigilanceMode = false 
+                                startListening()
+                            }
+                        }
+                        fallbackHandler.postDelayed(fallbackRunnable, 2500)
+
                         tts.speak(response, TextToSpeech.QUEUE_FLUSH, null, "DemoniWake")
                         
                         tts.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
                             override fun onStart(utteranceId: String?) {}
                             override fun onDone(utteranceId: String?) {
+                                fallbackHandler.removeCallbacks(fallbackRunnable)
                                 android.os.Handler(android.os.Looper.getMainLooper()).post {
                                     isVigilanceMode = false
                                     startListening()
                                 }
                             }
+                            @Deprecated("Deprecated")
                             override fun onError(utteranceId: String?) {
-                                android.os.Handler(android.os.Looper.getMainLooper()).post { startListening() }
+                                fallbackHandler.removeCallbacks(fallbackRunnable)
+                                android.os.Handler(android.os.Looper.getMainLooper()).post { 
+                                    isVigilanceMode = false
+                                    startListening() 
+                                }
                             }
                         })
                         return
@@ -333,22 +345,22 @@ class FloatingButtonService : Service() {
     }
 
     private fun startListening() {
-        if (isListening) return
-        try {
-            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 30000L)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 30000L)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 30000L)
-            }
-            android.os.Handler(android.os.Looper.getMainLooper()).post {
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            if (isListening) return@post
+            try {
+                setupSpeechRecognizer()
+                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                }
                 muteAudio(true)
-                speechRecognizer.cancel()
                 speechRecognizer.startListening(intent)
+                isListening = true
+                android.util.Log.d("DemoniTalk", "Microphone opened successfully")
+            } catch (e: Exception) {
+                isListening = false
+                android.util.Log.e("DemoniTalk", "StartListening failed", e)
             }
-        } catch (e: Exception) {
-            isListening = false
         }
     }
 
