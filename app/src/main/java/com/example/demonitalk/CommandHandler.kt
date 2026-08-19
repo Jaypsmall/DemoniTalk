@@ -35,11 +35,13 @@ class CommandHandler(private val context: Context) {
         return base.replace("demonio", "maquina")
             .replace("demoni", "maquina")
             .replace("puta", "maquina")
+            .replace("p***", "maquina")
     }
 
     private val wakeWords: List<String>
         get() = listOf(
             "Hex",
+            "hermano",
             "dice",
             "amigo",
             "ex",
