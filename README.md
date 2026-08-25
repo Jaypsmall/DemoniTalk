@@ -1,6 +1,15 @@
-# 😈 DemoniTalk (v1.0 - Demonic Edition)   ![Android](https://img.shields.io/badge/Android-181717?style=flat&logo=android&logoColor=yellow) ![Kotlin](https://img.shields.io/badge/kotlin-181717?style=flat&logo=kotlin&logoColor=yellow) 
+# 😈 DemoniTalk (v1.0.3 - Demonic Edition)   ![Android](https://img.shields.io/badge/Android-181717?style=flat&logo=android&logoColor=yellow) ![Kotlin](https://img.shields.io/badge/kotlin-181717?style=flat&logo=kotlin&logoColor=yellow) 
 
-DemoniTalk is an advanced voice assistant and automation engine for Android that requires root privileges. It allows you to map custom voice commands ("Triggers") to instantly execute console scripts, touch simulation macros, and low-level system process controls via a floating interface.
+**DemoniTalk** is an advanced voice assistant and automation engine for Android that requires root privileges. It allows you to map custom voice commands ("Triggers") to instantly execute console scripts, touch simulation macros, and low-level system process controls via a floating interface.
+
+**https://github.com/Jaypsmall/DemoniTalk/releases/download/root/DemoniTalk_v1.0.3.apk**
+
+---
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/e728adac-3cd9-4ed4-9d7b-88f2da9cca68" width="45%" />
+  <img src="https://github.com/user-attachments/assets/1feaade7-f9d6-4ce1-8829-be88116456e5" width="45%" />
+</p>
 
 ---
 
@@ -18,6 +27,13 @@ DemoniTalk is an advanced voice assistant and automation engine for Android that
 
 ---
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/85741729-884d-4b14-8111-38ef63084380" width="45%" />
+  <img src="https://github.com/user-attachments/assets/48a53de2-e572-4c50-a761-2409a387336b" width="45%" />  
+</p>
+
+---
+
 ## 🛠️ Technical Stack & Requirements
 
 * **Infrastructure:** Requires full Superuser access (Magisk / KernelSU) for command injection into the Android terminal.
@@ -29,14 +45,3 @@ DemoniTalk is an advanced voice assistant and automation engine for Android that
 Copyright © 2026. All rights reserved. The source code of this application is the private property of the developer. Unauthorized reproduction, distribution, or modification of this software is prohibited.
 
 *Developed with 🧡 by an independent developer.*
-
-
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/e728adac-3cd9-4ed4-9d7b-88f2da9cca68" width="30%" />
-  <img src="https://github.com/user-attachments/assets/1feaade7-f9d6-4ce1-8829-be88116456e5" width="30%" />
-</p>
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/85741729-884d-4b14-8111-38ef63084380" width="30%" />
-  <img src="https://github.com/user-attachments/assets/48a53de2-e572-4c50-a761-2409a387336b" width="30%" />  
-</p>
-
