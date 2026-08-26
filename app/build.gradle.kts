@@ -37,7 +37,7 @@ android {
 
 dependencies {
     implementation(libs.androidx.constraintlayout)
-    implementation("com.google.mediapipe:tasks-genai:0.10.35")
+    implementation(libs.tasks.genai)
     implementation(libs.gson)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)

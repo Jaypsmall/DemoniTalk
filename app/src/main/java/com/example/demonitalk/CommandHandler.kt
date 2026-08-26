@@ -30,7 +30,7 @@ class CommandHandler(private val context: Context) {
         val nfdNormalizedString = Normalizer.normalize(this, Normalizer.Form.NFD)
         val pattern = Pattern.compile("\\p{InCombiningDiacriticalMarks}+")
         val base = pattern.matcher(nfdNormalizedString).replaceAll("").lowercase().trim()
-        
+
         // Mapeamos las palabras solicitadas a "maquina" para estandarizar el wake-word
         return base.replace("demonio", "maquina")
             .replace("demoni", "maquina")
