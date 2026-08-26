@@ -313,7 +313,7 @@ body.light .talk {
 
 .buttons {
 
-  margin-top: 35px;
+  margin-top: 25px;
 
   display: flex;
 
@@ -383,7 +383,7 @@ body.light .talk {
 
 section {
 
-  padding: 90px 0;
+  padding: 30px 0;
 }
 
 
@@ -393,7 +393,7 @@ section {
 
   font-size: 34px;
 
-  margin-bottom: 45px;
+  margin-bottom: 35px;
 }
 
 
@@ -592,7 +592,7 @@ section {
 
 footer {
 
-  padding: 60px 0;
+  padding: 30px 0;
 
   text-align: center;
 
@@ -656,7 +656,7 @@ footer p {
 
   section {
 
-    padding: 65px 0;
+    padding: 45px 0;
   }
 
 
