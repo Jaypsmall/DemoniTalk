@@ -40,11 +40,8 @@ class CommandHandler(private val context: Context) {
 
     private val wakeWords: List<String>
         get() = listOf(
-            "Hex",
             "hermano",
-            "dice",
             "amigo",
-            "ex",
             "maquina"
             )
 
