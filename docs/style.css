@@ -185,7 +185,7 @@ header {
 
 
 .hero {
-  max-width: 850px;
+  max-width: 650px;
 }
 
 
@@ -210,7 +210,7 @@ header {
 
   font-size: clamp(42px, 8vw, 78px);
 
-  font-weight: 900;
+  font-weight: 800;
 
   letter-spacing: -3px;
 
