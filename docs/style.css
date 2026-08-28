@@ -2,7 +2,6 @@
    DEMONITALK WEBSITE
    Global Theme
 ===================================================== */
-
 :root {
 
   --bg: #070707;
@@ -17,7 +16,7 @@
   --accent: #ff2020;
   --accent-hover: #ff3b3b;
 
-  --yellow: #ffd600;
+  --yellow: #F0CA00;
 
   --border: #292929;
 
@@ -235,7 +234,7 @@ header {
 
 .moni {
 
-  color: #ffd600;
+  color: #F0CA00;
 
   text-shadow:
     0 0 18px rgba(255, 214, 0, 0.25);
