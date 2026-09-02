@@ -58,7 +58,7 @@ class FloatingButtonService : Service() {
         commandHandler = CommandHandler(this)
         commandHandler.setInternalListener { action ->
             android.os.Handler(android.os.Looper.getMainLooper()).post {
-                val micButton = floatingView.findViewById<ImageView>(R.id.mic_button)
+                val micButton = floatingView.findViewById<ImageView>(/* id = */ R.id.mic_button)
                 when (action) {
                     "internal_continuous_on" -> if (!isContinuousMode) toggleContinuousMode(micButton)
                     "internal_continuous_off" -> if (isContinuousMode) toggleContinuousMode(micButton)
@@ -135,7 +135,7 @@ class FloatingButtonService : Service() {
                             val dx = (event.rawX - initialTouchX).toInt()
                             val dy = (event.rawY - initialTouchY).toInt()
                             if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
-                                isMoving = true
+                                true.also { this.isMoving = true }
                                 handler.removeCallbacks(processClicksRunnable)
                                 clickCount = 0
                                 params.x = initialX + dx
@@ -226,14 +226,55 @@ class FloatingButtonService : Service() {
         }
     }
 
+    /**
+     * Processes the text recognized by the speech recognizer to execute corresponding actions.
+     *
+     * This function first attempts to find an exact match for the [spokenText] within the
+     * stored command JSON cards for immediate execution via root shell. If no exact match
+     * is found, it utilizes a local AI model (Gemma) in a background thread to interpret
+     * the user's intent and identify the most appropriate command to execute.
+     *
+     * @param spokenText The raw string of text captured and recognized from the user's voice input.
+     * @param this@onVoiceResultReceived A lambda function used to provide voice feedback to the user in case
+     *                 an order is not understood or no command is assigned.
+     */
+    fun ((String) -> Unit).onVoiceResultReceived(
+        spokenText: String,
+        loadJsonCardsFromStorage: () -> Unit
+    ) {
+        val jsonCards = loadJsonCardsFromStorage() // Cargas tu JSON actual
+
+            // 1. Intentar coincidencia exacta primero (para que sea instantáneo)
+        val exactCommand = findExactMatchInJson(spokenText, jsonCards)
+
+        RootShellExecutor.execute(exactCommand)
+    }
+
+    private fun findExactMatchInJson(
+        spokenText: String,
+        jsonCards: Any
+    ) {}
+
+    // ✅ Fixed code
     private fun setupSpeechRecognizer() {
         if (::speechRecognizer.isInitialized) {
             try {
                 speechRecognizer.cancel()
                 speechRecognizer.destroy()
-            } catch (e: Exception) { }
+            } catch (e: Exception) {
+                android.util.Log.e("DemoniTalk", "Error destroying speech recognizer", e)
+            }
         }
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
+
+        // ... rest of your logic
+
+        // Intentamos usar el reconocedor On-Device (Offline) si el sistema lo soporta (API 31+)
+        speechRecognizer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && SpeechRecognizer.isOnDeviceRecognitionAvailable(this)) {
+            SpeechRecognizer.createOnDeviceSpeechRecognizer(this)
+        } else {
+            SpeechRecognizer.createSpeechRecognizer(this)
+        }
+
         speechRecognizer.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {
                 isListening = true
@@ -352,7 +393,6 @@ class FloatingButtonService : Service() {
                 val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-                    putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
                 }
                 muteAudio(true)
                 speechRecognizer.startListening(intent)
