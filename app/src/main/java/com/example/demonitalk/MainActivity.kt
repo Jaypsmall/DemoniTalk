@@ -3,9 +3,7 @@ package com.example.demonitalk
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
-import android.os.Environment
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -21,8 +19,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -40,8 +36,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
@@ -104,9 +102,6 @@ import com.example.demonitalk.ui.theme.AshGrey
 import com.example.demonitalk.ui.theme.DemoniTalkTheme
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.launch
-import java.io.File
-import java.io.FileOutputStream
-import java.io.InputStreamReader
 
 class MainActivity : ComponentActivity() {
 
@@ -161,21 +156,38 @@ class MainActivity : ComponentActivity() {
         val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
         val scope = rememberCoroutineScope()
 
+        val exportLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.CreateDocument("application/json")
+        ) { uri ->
+            uri?.let {
+                try {
+                    val gson = com.google.gson.GsonBuilder().setPrettyPrinting().create()
+                    val json = gson.toJson(commands)
+                    contentResolver.openOutputStream(it)?.use { out ->
+                        out.write(json.toByteArray())
+                    }
+                    showSuccessDialog = true
+                } catch (e: Exception) {
+                    Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+
         val importLauncher = rememberLauncherForActivityResult(
             contract = ActivityResultContracts.GetContent()
         ) { uri ->
             uri?.let {
                 try {
-                    contentResolver.openInputStream(it)?.use { inputStream ->
-                        val reader = InputStreamReader(inputStream)
+                    contentResolver.openInputStream(it)?.bufferedReader()?.use { reader ->
+                        val json = reader.readText()
                         val type = object : TypeToken<List<VoiceCommand>>() {}.type
-                        val importedCommands: List<VoiceCommand> = com.google.gson.Gson().fromJson(reader, type)
+                        val importedCommands: List<VoiceCommand> = com.google.gson.Gson().fromJson(json, type)
                         commands = importedCommands
                         repository.saveCommands(commands)
-                        Toast.makeText(this, "Comandos Importados! 😈", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "¡Comandos restaurados! 😈", Toast.LENGTH_SHORT).show()
                     }
                 } catch (e: Exception) {
-                    Toast.makeText(this, "Error al importar: ${e.message}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Fallo al importar: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -244,12 +256,12 @@ class MainActivity : ComponentActivity() {
                         }
                         Spacer(modifier = Modifier.height(16.dp))
                         DrawerButton(text = if (isEnglish) "Import" else "Importar", icon = Icons.Default.Upload) {
-                            importLauncher.launch("application/json")
+                            importLauncher.launch("*/*")
                             scope.launch { drawerState.close() }
                         }
                         Spacer(modifier = Modifier.height(16.dp))
                         DrawerButton(text = if (isEnglish) "Export" else "Exportar", icon = Icons.Default.Download) { 
-                            exportCommands { showSuccessDialog = true }
+                            exportLauncher.launch("DemoniTalk_Backup.json")
                             scope.launch { drawerState.close() }
                         }
                         Spacer(modifier = Modifier.height(16.dp))
@@ -756,49 +768,6 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             }
-        }
-    }
-
-    private fun exportCommands(onSuccess: () -> Unit) {
-        val commands = repository.loadCommands()
-        val gson = com.google.gson.GsonBuilder().setPrettyPrinting().create()
-        val json = gson.toJson(commands)
-        val fileName = "DemoniTalk_Backup_${System.currentTimeMillis()}.json"
-        
-        val customPath = repository.getExportPath().trim()
-
-        try {
-            if (customPath.isNotEmpty()) {
-                val dir = File(customPath)
-                if (!dir.exists()) dir.mkdirs()
-                val file = File(dir, fileName)
-                FileOutputStream(file).use { it.write(json.toByteArray()) }
-                onSuccess()
-                return
-            }
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val resolver = contentResolver
-                val contentValues = android.content.ContentValues().apply {
-                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/json")
-                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-                }
-                val uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
-                uri?.let {
-                    resolver.openOutputStream(it)?.use { outputStream ->
-                        outputStream.write(json.toByteArray())
-                    }
-                    onSuccess()
-                }
-            } else {
-                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                val file = File(downloadsDir, fileName)
-                FileOutputStream(file).use { it.write(json.toByteArray()) }
-                onSuccess()
-            }
-        } catch (e: Exception) {
-            Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
