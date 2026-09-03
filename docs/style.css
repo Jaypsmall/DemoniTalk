@@ -539,7 +539,7 @@ section {
   display: grid;
 
   grid-template-columns:
-    repeat(3, 1fr);
+    repeat(4, minmax(0, 1fr));
 
   gap: 20px;
 }
@@ -582,6 +582,20 @@ section {
   color: var(--text-secondary);
 
   font-size: 14px;
+}
+
+
+.requirements-note {
+
+  max-width: 720px;
+
+  margin: 22px auto 0;
+
+  color: var(--text-secondary);
+
+  font-size: 14px;
+
+  text-align: center;
 }
 
 

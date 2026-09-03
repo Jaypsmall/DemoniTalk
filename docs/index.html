@@ -10,6 +10,11 @@
     name="description"
     content="DemoniTalk v1.0.3 - Advanced voice assistant and root automation engine for Android."
   >
+  <meta name="theme-color" content="#070707">
+  <meta property="og:title" content="DemoniTalk | Demonic Edition">
+  <meta property="og:description" content="Voice assistant and root automation engine for Android.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://github.com/user-attachments/assets/e728adac-3cd9-4ed4-9d7b-88f2da9cca68">
 
   <link rel="stylesheet" href="style.css">
 </head>
@@ -58,7 +63,7 @@
         <a
           class="button primary"
           href="https://github.com/Jaypsmall/DemoniTalk/releases/download/root/DemoniTalk_v1.0.3.apk">
-          ↓ DOWNLOAD APK
+          ↓ DOWNLOAD APK · v1.0.3
         </a>
 
         <a
@@ -230,6 +235,12 @@
       <div class="requirements-box">
 
         <div class="requirement">
+          <div class="requirement-icon">📱</div>
+          <strong>Android 8.0+</strong>
+          <p>API 26 or newer</p>
+        </div>
+
+        <div class="requirement">
           <div class="requirement-icon">🔓</div>
           <strong>Root Access</strong>
           <p>Magisk or KernelSU</p>
@@ -248,6 +259,11 @@
         </div>
 
       </div>
+
+      <p class="requirements-note">
+        Root access gives DemoniTalk permission to run system commands and automation actions.
+        Install only on devices you control.
+      </p>
 
     </div>
 
@@ -294,6 +310,7 @@
 
     const screen1 = document.getElementById("screen1");
     const screen2 = document.getElementById("screen2");
+    const themeColor = document.querySelector('meta[name="theme-color"]');
 
 
     const screenshots = {
@@ -311,31 +328,27 @@
     };
 
 
-    let lightMode = false;
+    let lightMode = localStorage.getItem("demonitalk-theme") === "light";
+
+    function applyTheme() {
+
+      body.classList.toggle("light", lightMode);
+      screen1.src = screenshots[lightMode ? "light" : "dark"][0];
+      screen2.src = screenshots[lightMode ? "light" : "dark"][1];
+      button.textContent = lightMode ? "🌙" : "☀️";
+      button.setAttribute("aria-label", lightMode ? "Switch to dark theme" : "Switch to light theme");
+      button.setAttribute("aria-pressed", String(lightMode));
+      themeColor.setAttribute("content", lightMode ? "#f3f3f3" : "#070707");
+    }
+
+    applyTheme();
 
 
     button.addEventListener("click", () => {
 
       lightMode = !lightMode;
-
-      body.classList.toggle("light", lightMode);
-
-
-      if (lightMode) {
-
-        screen1.src = screenshots.light[0];
-        screen2.src = screenshots.light[1];
-
-        button.textContent = "🌙";
-
-      } else {
-
-        screen1.src = screenshots.dark[0];
-        screen2.src = screenshots.dark[1];
-
-        button.textContent = "☀️";
-
-      }
+      localStorage.setItem("demonitalk-theme", lightMode ? "light" : "dark");
+      applyTheme();
 
     });
 
