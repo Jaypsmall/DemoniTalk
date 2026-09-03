@@ -46,7 +46,7 @@ body.light {
 
   --border: #ff3b3b;
 
-  --shadow: rgba(0, 0, 0, 0.12);
+  --shadow: rgba(0, 0, 0, 0.33);
 
   --button-text: #ffffff;
 }
@@ -177,7 +177,7 @@ header {
   background:
     radial-gradient(
       circle at center,
-      rgba(255, 0, 0, 0.13),
+      rgba(255, 0, 0, 0.33),
       transparent 45%
     );
 }
@@ -196,7 +196,7 @@ header {
 
   filter:
     drop-shadow(
-      0 0 15px rgba(255, 0, 0, 0.35)
+      0 0 15px rgba(255, 0, 0, 0.55)
     );
 }
 
@@ -226,7 +226,7 @@ header {
   color: #ff2020;
 
   text-shadow:
-    0 0 18px rgba(255, 32, 32, 0.35);
+    0 0 18px rgba(255, 32, 32, 0.45);
 }
 
 
@@ -234,10 +234,10 @@ header {
 
 .moni {
 
-  color: #F0CA00;
+  color: #EEF900;
 
   text-shadow:
-    0 0 18px rgba(255, 214, 0, 0.25);
+    0 0 18px rgba(255, 214, 0, 0.33);
 }
 
 
@@ -248,7 +248,7 @@ header {
   color: #ffffff;
 
   text-shadow:
-    0 0 14px rgba(255, 255, 255, 0.08);
+    0 0 14px rgba(255, 255, 255, 0.15);
 
   transition:
     color 0.35s ease,
