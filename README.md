@@ -40,7 +40,7 @@
 * **Accessibility / Window Services:** Screen overlay permission to display the floating microphone widget in real-time.
 * **Ecosystem:** Includes a custom parser to import and export your macro lists via local configuration files. ---
 
-## 📄 License and Copyright
+## 📄 License & Copyright
 
 Copyright © 2026. All rights reserved. The source code of this application is the private property of the developer. Unauthorized reproduction, distribution, or modification of this software is prohibited.
 
