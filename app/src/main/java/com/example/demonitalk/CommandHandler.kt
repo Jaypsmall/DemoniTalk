@@ -75,7 +75,7 @@ class CommandHandler(private val context: Context) {
             isFuzzyMatch(normalizedText, trigger)
         }
 
-        return (if (command != null) {
+        return if (command != null) {
             if (command.action.startsWith("internal_")) {
                 internalListener?.invoke(command.action)
             } else {
@@ -83,8 +83,8 @@ class CommandHandler(private val context: Context) {
             }
             CommandResult.Executed
         } else {
-
-        }) as CommandResult
+            CommandResult.Ignored
+        }
     }
 
     enum class CommandResult {
