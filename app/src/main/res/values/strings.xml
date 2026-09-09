@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">DemoniTalk</string>
+    <string name="accessibility_description">Permite a DemoniTalk interactuar con otras aplicaciones para automatizar tareas.</string>
 </resources>
