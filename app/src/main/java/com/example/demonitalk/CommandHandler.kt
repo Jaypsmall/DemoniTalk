@@ -1,10 +1,8 @@
 package com.example.demonitalk
 
 import android.content.Context
-import android.content.Intent
 import android.hardware.camera2.CameraManager
 import android.util.Log
-import java.io.DataOutputStream
 import java.text.Normalizer
 import java.util.regex.Pattern
 
@@ -13,6 +11,7 @@ class CommandHandler(private val context: Context) {
     private val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
     private var cameraId: String? = null
     private var internalListener: ((String) -> Unit)? = null
+    private val accessibilityController = AccessibilityController(context)
 
     init {
         try {
@@ -67,6 +66,61 @@ class CommandHandler(private val context: Context) {
             return CommandResult.WakeWordOnly
         }
 
+        // Caso especial para escribir mensajes
+        if (normalizedText.startsWith("manda este mensaje") || normalizedText.startsWith("escribe")) {
+            val content = normalizedText
+                .replace("manda este mensaje", "")
+                .replace("escribe", "")
+                .trim()
+            if (content.isNotEmpty()) {
+                Log.d("CommandHandler", "Executing type command: $content")
+                Thread { processAction("type:$content") }.start()
+                return CommandResult.Executed
+            }
+        }
+
+        // Caso: "envia el mensaje" o "dale a enviar"
+        if (normalizedText.contains("envia el mensaje") || normalizedText.contains("dale a enviar") || normalizedText == "enviar") {
+            Thread { processAction("click_send") }.start()
+            return CommandResult.Executed
+        }
+
+        // Caso: "abre la aplicacion [NOMBRE]" o "abre [NOMBRE]"
+        if (normalizedText.startsWith("abre la aplicacion") || normalizedText.startsWith("abre")) {
+            val appName = normalizedText
+                .replace("abre la aplicacion", "")
+                .replace("abre", "")
+                .trim()
+            if (appName.isNotEmpty()) {
+                Thread { processAction("open_app:$appName") }.start()
+                return CommandResult.Executed
+            }
+        }
+
+        // Navegación básica
+        when (normalizedText) {
+            "vuelve atras", "atras" -> {
+                Thread { processAction("global_back") }.start()
+                return CommandResult.Executed
+            }
+            "ve a inicio", "pantalla de inicio", "vete a casa" -> {
+                Thread { processAction("global_home") }.start()
+                return CommandResult.Executed
+            }
+            "aplicaciones recientes", "recientes" -> {
+                Thread { processAction("global_recents") }.start()
+                return CommandResult.Executed
+            }
+            "abre el primer chat", "primer chat", "primer mensaje" -> {
+                Thread { processAction("click_first_chat") }.start()
+                return CommandResult.Executed
+            }
+            "desactivar escucha", "deja de escuchar", "para de escuchar", "silencio" -> {
+                internalListener?.invoke("internal_stop")
+                return CommandResult.Executed
+            }
+        }
+
         Log.d("CommandHandler", "Searching for command in: '$normalizedText'")
         
         val command = commands.find { 
@@ -79,7 +133,7 @@ class CommandHandler(private val context: Context) {
             if (command.action.startsWith("internal_")) {
                 internalListener?.invoke(command.action)
             } else {
-                Thread { processAction(command.action, command.isRoot) }.start()
+                Thread { processAction(command.action) }.start()
             }
             CommandResult.Executed
         } else {
@@ -99,7 +153,40 @@ class CommandHandler(private val context: Context) {
         return text.contains(trigger.substring(0, (trigger.length * 0.8).toInt()))
     }
 
-    private fun processAction(action: String, isRoot: Boolean) {
+    private fun processAction(action: String) {
+        // Acciones inteligentes: si hay Root, usamos comandos de sistema que son más fiables
+        if (ShellUtils.isRootAvailable()) {
+            when (action) {
+                "global_back" -> {
+                    ShellUtils.executeCommand("input keyevent 4")
+                    return
+                }
+                "global_home" -> {
+                    ShellUtils.executeCommand("input keyevent 3")
+                    return
+                }
+                "global_recents" -> {
+                    ShellUtils.executeCommand("input keyevent 187")
+                    return
+                }
+                "click_send" -> {
+                    // Para enviar, primero intentamos por accesibilidad (es más preciso)
+                    // pero si falla o no está activo, no podemos hacer mucho más por shell simple
+                    accessibilityController.execute(action)
+                    return
+                }
+            }
+        }
+
+        // Si no hay Root o es una acción específica, usamos el AccessibilityController
+        if (action.startsWith("open_app:") || 
+            action == "click_send" || 
+            action.startsWith("global_")) {
+            Log.d("CommandHandler", "Executing Smart Action: $action")
+            accessibilityController.execute(action)
+            return
+        }
+
         // Comandos internos de alta velocidad
         when (action) {
             "torch_on" -> {
@@ -112,10 +199,17 @@ class CommandHandler(private val context: Context) {
             }
         }
 
-        if (isRoot) {
-            executeRootCommand(action)
+        if (ShellUtils.isRootAvailable()) {
+            Log.d("CommandHandler", "Executing via Root: $action")
+            if (action.startsWith("type:")) {
+                val text = action.removePrefix("type:")
+                ShellUtils.executeCommand("input text \"$text\"")
+            } else {
+                ShellUtils.executeCommand(action)
+            }
         } else {
-            executeNormalCommand(action)
+            Log.d("CommandHandler", "Executing via Accessibility: $action")
+            accessibilityController.execute(action)
         }
     }
 
@@ -127,50 +221,6 @@ class CommandHandler(private val context: Context) {
             }
         } catch (e: Exception) {
             Log.e("CommandHandler", "Error toggling flashlight", e)
-        }
-    }
-
-    private fun executeNormalCommand(action: String) {
-        Log.d("CommandHandler", "Attempting to execute action: $action")
-        try {
-            // Si parece un nombre de paquete, intentamos lanzarlo como App
-            if (action.contains(".") && !action.contains(" ") && !action.contains("/") && !action.contains("-")) {
-                val intent = context.packageManager.getLaunchIntentForPackage(action)
-                if (intent != null) {
-                    Log.d("CommandHandler", "Launching app: $action")
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    context.startActivity(intent)
-                    return
-                }
-            }
-
-            // Si no es un paquete o falla el intent, lo ejecutamos como comando shell
-            Log.d("CommandHandler", "Executing as shell command: $action")
-            val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", action))
-            
-            // Hilo para capturar errores y que no se bloquee el proceso
-            Thread {
-                val error = process.errorStream.bufferedReader().readText()
-                if (error.isNotEmpty()) Log.e("CommandHandler", "Shell Error: $error")
-                val output = process.inputStream.bufferedReader().readText()
-                if (output.isNotEmpty()) Log.d("CommandHandler", "Shell Output: $output")
-            }.start()
-            
-        } catch (e: Exception) {
-            Log.e("CommandHandler", "Error executing command: $action", e)
-        }
-    }
-
-    private fun executeRootCommand(command: String) {
-        try {
-            val process = Runtime.getRuntime().exec("su")
-            val os = DataOutputStream(process.outputStream)
-            os.writeBytes("$command\n")
-            os.writeBytes("exit\n")
-            os.flush()
-            process.waitFor()
-        } catch (e: Exception) {
-            Log.e("CommandHandler", "Error executing root command", e)
         }
     }
 }
