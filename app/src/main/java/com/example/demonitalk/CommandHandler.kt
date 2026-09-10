@@ -111,6 +111,14 @@ class CommandHandler(private val context: Context) {
                 Thread { processAction("global_recents") }.start()
                 return CommandResult.Executed
             }
+            "abre el primer chat", "primer chat", "primer mensaje" -> {
+                Thread { processAction("click_first_chat") }.start()
+                return CommandResult.Executed
+            }
+            "desactivar escucha", "deja de escuchar", "para de escuchar", "silencio" -> {
+                internalListener?.invoke("internal_stop")
+                return CommandResult.Executed
+            }
         }
 
         Log.d("CommandHandler", "Searching for command in: '$normalizedText'")
@@ -146,6 +154,39 @@ class CommandHandler(private val context: Context) {
     }
 
     private fun processAction(action: String) {
+        // Acciones inteligentes: si hay Root, usamos comandos de sistema que son más fiables
+        if (ShellUtils.isRootAvailable()) {
+            when (action) {
+                "global_back" -> {
+                    ShellUtils.executeCommand("input keyevent 4")
+                    return
+                }
+                "global_home" -> {
+                    ShellUtils.executeCommand("input keyevent 3")
+                    return
+                }
+                "global_recents" -> {
+                    ShellUtils.executeCommand("input keyevent 187")
+                    return
+                }
+                "click_send" -> {
+                    // Para enviar, primero intentamos por accesibilidad (es más preciso)
+                    // pero si falla o no está activo, no podemos hacer mucho más por shell simple
+                    accessibilityController.execute(action)
+                    return
+                }
+            }
+        }
+
+        // Si no hay Root o es una acción específica, usamos el AccessibilityController
+        if (action.startsWith("open_app:") || 
+            action == "click_send" || 
+            action.startsWith("global_")) {
+            Log.d("CommandHandler", "Executing Smart Action: $action")
+            accessibilityController.execute(action)
+            return
+        }
+
         // Comandos internos de alta velocidad
         when (action) {
             "torch_on" -> {

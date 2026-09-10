@@ -6,9 +6,15 @@ import android.util.Log
 class AccessibilityController(private val context: Context) {
 
     fun execute(action: String): Boolean {
+        // Acciones que NO requieren el servicio de accesibilidad activo
+        if (action.startsWith("open_app:")) {
+            val appName = action.removePrefix("open_app:").trim()
+            return launchAppByName(appName)
+        }
+
         val service = DemoniAccessibilityService.instance
         if (service == null) {
-            Log.e("AccessibilityController", "Service not running")
+            Log.e("AccessibilityController", "Service not running for action: $action")
             return false
         }
 
@@ -21,13 +27,8 @@ class AccessibilityController(private val context: Context) {
             action == "global_back" -> service.performBack()
             action == "global_home" -> service.performHome()
             action == "global_recents" -> service.performRecents()
+            action == "click_first_chat" -> service.clickFirstConversation()
             
-            // "abre esta app" o "abre [Nombre]"
-            action.startsWith("open_app:") -> {
-                val appName = action.removePrefix("open_app:").trim()
-                launchAppByName(appName)
-            }
-
             // Si parece un nombre de paquete, intentamos lanzarlo
             action.contains(".") && !action.contains(" ") -> {
                 val intent = context.packageManager.getLaunchIntentForPackage(action)

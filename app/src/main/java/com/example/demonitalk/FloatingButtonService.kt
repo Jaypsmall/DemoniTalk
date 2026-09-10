@@ -67,6 +67,15 @@ class FloatingButtonService : Service() {
                         isContinuousMode = false
                         micButton.setBackgroundResource(R.drawable.bg_floating_button_active)
                     }
+                    "internal_stop" -> {
+                        isContinuousMode = false
+                        isVigilanceMode = false
+                        isListening = false
+                        muteAudio(false)
+                        speechRecognizer.stopListening()
+                        micButton.setBackgroundResource(R.drawable.bg_floating_button)
+                        Toast.makeText(this@FloatingButtonService, "Escucha desactivada", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
         }
