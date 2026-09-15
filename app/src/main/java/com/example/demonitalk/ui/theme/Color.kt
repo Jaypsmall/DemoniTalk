@@ -11,4 +11,4 @@ val AshGrey = Color(0xFF9E9E9E)      // Gris ceniza para textos secundarios
 val SoulWhite = Color(0xFFE0E0E0)    // Blanco roto para que no canse la vista
 val ShinySilver = Color(0xFFD1D5D8)  // Plata brillante metálico
 val BrimstoneYellow = Color(0xFFFFD600) // Amarillo azufre para advertencias/root
-val DemoniPurple = Color(0xFF9C27B0)    // Morado diablito 😈
+val DemoniPurple = Color(0xFF9C27B0)    // Morado diablito
