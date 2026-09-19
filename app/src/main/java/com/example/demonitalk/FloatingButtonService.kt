@@ -1,26 +1,29 @@
 package com.example.demonitalk
 
 import android.annotation.SuppressLint
-import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
-import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import java.util.Locale
 
@@ -28,399 +31,370 @@ class FloatingButtonService : Service() {
 
     private lateinit var windowManager: WindowManager
     private lateinit var floatingView: View
-    private lateinit var speechRecognizer: SpeechRecognizer
+    private var speechRecognizer: SpeechRecognizer? = null
     private lateinit var tts: TextToSpeech
     private lateinit var commandHandler: CommandHandler
     private lateinit var repository: CommandRepository
     private lateinit var audioManager: AudioManager
+    
     private var originalSystemVolume: Int = -1
     private var isContinuousMode = false
     private var isVigilanceMode = false
     private var isListening = false
+    private var isWaitingForCommandAfterWake = false
+    private var isServiceDestroyed = false
+    
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val NOTIFICATION_ID = 123
     private val CHANNEL_ID = "DemoniTalk_Silent_v3"
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val action = intent?.action
+        if (action != null) {
+            when (action) {
+                "ACTION_MODE_YELLOW" -> {
+                    isContinuousMode = false; isVigilanceMode = false; isWaitingForCommandAfterWake = true
+                    startListening()
+                }
+                "ACTION_MODE_BLUE" -> {
+                    isVigilanceMode = true; isContinuousMode = false; isWaitingForCommandAfterWake = false
+                    updateButtonUI()
+                    startListening()
+                }
+                "ACTION_MODE_GREEN" -> {
+                    isContinuousMode = true; isVigilanceMode = false; isWaitingForCommandAfterWake = false
+                    updateButtonUI()
+                    startListening()
+                }
+                "ACTION_MODE_RED" -> {
+                    stopEverything()
+                }
+                "ACTION_STOP_SERVICE" -> stopSelf()
+            }
+        }
+        return START_STICKY
+    }
+
     @SuppressLint("InflateParams", "ClickableViewAccessibility")
     override fun onCreate() {
         super.onCreate()
+        isServiceDestroyed = false
         createNotificationChannel()
         startForegroundService()
-        
+
         tts = TextToSpeech(this) { status ->
-            if (status != TextToSpeech.ERROR) {
-                tts.language = Locale.getDefault()
-            }
+            if (status != TextToSpeech.ERROR)
+                try { tts.language = Locale.getDefault() } catch (e: Exception) { }
         }
-        
+
         repository = CommandRepository(this)
         commandHandler = CommandHandler(this)
         commandHandler.setInternalListener { action ->
-            android.os.Handler(android.os.Looper.getMainLooper()).post {
-                val micButton = floatingView.findViewById<ImageView>(/* id = */ R.id.mic_button)
+            mainHandler.post {
                 when (action) {
-                    "internal_continuous_on" -> if (!isContinuousMode) toggleContinuousMode(micButton)
-                    "internal_continuous_off" -> if (isContinuousMode) toggleContinuousMode(micButton)
-                    "internal_force_manual" -> {
-                        isVigilanceMode = false
-                        isContinuousMode = false
-                        micButton.setBackgroundResource(R.drawable.bg_floating_button_active)
-                    }
-                    "internal_stop" -> {
-                        isContinuousMode = false
-                        isVigilanceMode = false
-                        isListening = false
-                        muteAudio(false)
-                        speechRecognizer.stopListening()
-                        micButton.setBackgroundResource(R.drawable.bg_floating_button)
-                        Toast.makeText(this@FloatingButtonService, "Escucha desactivada", Toast.LENGTH_SHORT).show()
+                    "internal_stop" -> stopEverything()
+                    "internal_continuous_on" -> if (!isContinuousMode) {
+                        isContinuousMode = true; isVigilanceMode = false
+                        updateButtonUI(); startListening()
                     }
                 }
             }
         }
-        audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
 
+        audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        
+        // Solo intentamos crear la vista si tenemos el permiso
+        if (android.provider.Settings.canDrawOverlays(this)) {
+            createFloatingView()
+        } else {
+            Log.i("DemoniTalk", "Iniciando servicio sin interfaz flotante (falta permiso de superposición)")
+        }
+    }
+
+    @SuppressLint("InflateParams", "ClickableViewAccessibility")
+    private fun createFloatingView() {
         floatingView = LayoutInflater.from(this).inflate(R.layout.layout_floating_button, null)
 
         val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         )
-
         params.gravity = Gravity.TOP or Gravity.START
-        params.x = 460
-        params.y = 948
-
-        windowManager.addView(floatingView, params)
-        setupSpeechRecognizer()
-
-        floatingView.findViewById<ImageView>(R.id.mic_button).also { btn ->
-            btn.setOnTouchListener(object : View.OnTouchListener {
-                private var initialX: Int = 0
-                private var initialY: Int = 0
-                private var initialTouchX: Float = 0.0f
-                private var initialTouchY: Float = 0.0f
-                private var isMoving = false
-                private var clickCount = 0
-                private val handler = android.os.Handler(android.os.Looper.getMainLooper())
-
+        params.x = 460; params.y = 948
+        
+        try {
+            windowManager.addView(floatingView, params)
+            
+            floatingView.findViewById<ImageView>(R.id.mic_button).setOnTouchListener(object : View.OnTouchListener {
+                private var initialX: Int = 0; private var initialY: Int = 0
+                private var initialTouchX: Float = 0f; private var initialTouchY: Float = 0f
+                private var isMoving = false; private var clickCount = 0
                 private val processClicksRunnable = Runnable {
-                    val mBtn = floatingView.findViewById<ImageView>(R.id.mic_button)
                     when (clickCount) {
-                        1 -> {
-                            isContinuousMode = false
-                            isVigilanceMode = false
-                            mBtn.setBackgroundResource(R.drawable.bg_floating_button_active)
-                            startListening()
-                        }
-                        2 -> toggleVigilanceMode(mBtn)
-                        3 -> toggleContinuousMode(mBtn)
-                        4 -> {
-                            val intent = Intent(this@FloatingButtonService, MainActivity::class.java)
-                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            startActivity(intent)
+                        1 -> { isContinuousMode = false; isVigilanceMode = false; isWaitingForCommandAfterWake = true; startListening() }
+                        2 -> { isVigilanceMode = !isVigilanceMode; isContinuousMode = false; updateButtonUI(); if(isVigilanceMode) startListening() else stopEverything() }
+                        3 -> { isContinuousMode = !isContinuousMode; isVigilanceMode = false; updateButtonUI(); if(isContinuousMode) startListening() else stopEverything() }
+                        4 -> { 
+                            val intent = Intent(this@FloatingButtonService, MainActivity::class.java).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                            startActivity(intent) 
                         }
                         5 -> stopSelf()
                     }
                     clickCount = 0
                 }
-
                 override fun onTouch(v: View, event: android.view.MotionEvent): Boolean {
                     when (event.action) {
-                        android.view.MotionEvent.ACTION_DOWN -> {
-                            initialX = params.x
-                            initialY = params.y
-                            initialTouchX = event.rawX
-                            initialTouchY = event.rawY
-                            isMoving = false
-                            return true
-                        }
+                        android.view.MotionEvent.ACTION_DOWN -> { initialX = params.x; initialY = params.y; initialTouchX = event.rawX; initialTouchY = event.rawY; isMoving = false; return true }
                         android.view.MotionEvent.ACTION_MOVE -> {
-                            val dx = (event.rawX - initialTouchX).toInt()
-                            val dy = (event.rawY - initialTouchY).toInt()
+                            val dx = (event.rawX - initialTouchX).toInt(); val dy = (event.rawY - initialTouchY).toInt()
                             if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
-                                true.also { this.isMoving = true }
-                                handler.removeCallbacks(processClicksRunnable)
-                                clickCount = 0
-                                params.x = initialX + dx
-                                params.y = initialY + dy
-                                windowManager.updateViewLayout(floatingView, params)
+                                isMoving = true; mainHandler.removeCallbacks(processClicksRunnable); clickCount = 0
+                                params.x = initialX + dx; params.y = initialY + dy
+                                try { windowManager.updateViewLayout(floatingView, params) } catch(e: Exception) {}
                             }
                             return true
                         }
-                        android.view.MotionEvent.ACTION_UP -> {
-                            if (!isMoving) {
-                                clickCount++
-                                handler.removeCallbacks(processClicksRunnable)
-                                handler.postDelayed(processClicksRunnable, 350)
-                            }
-                            return true
-                        }
+                        android.view.MotionEvent.ACTION_UP -> { if (!isMoving) { clickCount++; mainHandler.removeCallbacks(processClicksRunnable); mainHandler.postDelayed(processClicksRunnable, 350) }; return true }
                     }
                     return false
                 }
             })
+        } catch (e: Exception) {
+            Log.e("DemoniTalk", "Error al añadir vista flotante: ${e.message}")
+        }
+    }
+
+    private fun stopEverything() {
+        isContinuousMode = false; isVigilanceMode = false; isListening = false; isWaitingForCommandAfterWake = false
+        muteAudio(false)
+        try { speechRecognizer?.stopListening(); speechRecognizer?.cancel() } catch (e: Exception) {}
+        updateButtonUI()
+    }
+
+    private fun updateButtonUI() {
+        if (!::floatingView.isInitialized) return
+        val micButton = try { floatingView.findViewById<ImageView>(R.id.mic_button) } catch(e: Exception) { null } ?: return
+        when {
+            isWaitingForCommandAfterWake -> micButton.setImageResource(R.drawable.amarillo)
+            isContinuousMode -> micButton.setImageResource(R.drawable.verde)
+            isVigilanceMode -> micButton.setImageResource(R.drawable.azul)
+            else -> micButton.setImageResource(R.drawable.rojo)
         }
     }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val serviceChannel = NotificationChannel(CHANNEL_ID, "DemoniTalk Service", NotificationManager.IMPORTANCE_LOW)
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(serviceChannel)
+            getSystemService(NotificationManager::class.java).createNotificationChannel(serviceChannel)
         }
     }
 
     private fun startForegroundService() {
-        val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.icono_demoni)
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.icono_demoni2)
             .setContentTitle("DemoniTalk Activo")
+            .setContentText("Escuchando comandos de voz...")
             .setSilent(true)
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .build()
-        startForeground(NOTIFICATION_ID, notification)
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                startForeground(
+                    NOTIFICATION_ID, 
+                    notification, 
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+            Log.d("DemoniTalk", "Servicio Foreground iniciado correctamente")
+        } catch (e: Exception) {
+            Log.e("DemoniTalk", "Error al iniciar Foreground Service: ${e.message}")
+        }
     }
 
     private fun muteAudio(mute: Boolean) {
         try {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !nm.isNotificationPolicyAccessGranted) {
+                return
+            }
+
             if (mute) {
                 if (originalSystemVolume == -1) originalSystemVolume = audioManager.getStreamVolume(AudioManager.STREAM_SYSTEM)
                 audioManager.setStreamVolume(AudioManager.STREAM_SYSTEM, 0, 0)
             } else {
-                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                    if (originalSystemVolume != -1) {
-                        audioManager.setStreamVolume(AudioManager.STREAM_SYSTEM, originalSystemVolume, 0)
+                mainHandler.postDelayed({ 
+                    if (!isServiceDestroyed && originalSystemVolume != -1) {
+                        try { audioManager.setStreamVolume(AudioManager.STREAM_SYSTEM, originalSystemVolume, 0) } catch(e: Exception) {}
                     }
                 }, 600)
             }
         } catch (e: Exception) { }
     }
 
-    private fun toggleContinuousMode(view: ImageView) {
-        isContinuousMode = !isContinuousMode
-        isVigilanceMode = false
-        if (isContinuousMode) {
-            muteAudio(true)
-            view.setBackgroundResource(R.drawable.bg_floating_button_continuous)
-            Toast.makeText(this, "Modo Continuo 🟢", Toast.LENGTH_SHORT).show()
-            startListening()
-        } else {
-            isListening = false
-            muteAudio(false)
-            view.setBackgroundResource(R.drawable.bg_floating_button)
-            speechRecognizer.cancel()
-            Toast.makeText(this, "Modo Manual 🔴", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun toggleVigilanceMode(view: ImageView) {
-        isVigilanceMode = !isVigilanceMode
-        isContinuousMode = false
-        if (isVigilanceMode) {
-            muteAudio(true)
-            view.setBackgroundResource(R.drawable.bg_floating_button_vigilance)
-            Toast.makeText(this, "Modo Vigilancia 'Demoni' 🔵", Toast.LENGTH_SHORT).show()
-            startListening()
-        } else {
-            isListening = false
-            muteAudio(false)
-            view.setBackgroundResource(R.drawable.bg_floating_button)
-            speechRecognizer.cancel()
-            Toast.makeText(this, "Modo Manual 🔴", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    /**
-     * Processes the text recognized by the speech recognizer to execute corresponding actions.
-     *
-     * This function first attempts to find an exact match for the [spokenText] within the
-     * stored command JSON cards for immediate execution via root shell. If no exact match
-     * is found, it utilizes a local AI model (Gemma) in a background thread to interpret
-     * the user's intent and identify the most appropriate command to execute.
-     *
-     * @param spokenText The raw string of text captured and recognized from the user's voice input.
-     * @param this@onVoiceResultReceived A lambda function used to provide voice feedback to the user in case
-     *                 an order is not understood or no command is assigned.
-     */
-    fun ((String) -> Unit).onVoiceResultReceived(
-        spokenText: String,
-        loadJsonCardsFromStorage: () -> Unit
-    ) {
-        val jsonCards = loadJsonCardsFromStorage() // Cargas tu JSON actual
-
-            // 1. Intentar coincidencia exacta primero (para que sea instantáneo)
-        val exactCommand = findExactMatchInJson(spokenText, jsonCards)
-
-        RootShellExecutor.execute(exactCommand)
-    }
-
-    private fun findExactMatchInJson(
-        spokenText: String,
-        jsonCards: Any
-    ) {}
-
-    // ✅ Fixed code
     private fun setupSpeechRecognizer() {
-        if (::speechRecognizer.isInitialized) {
-            try {
-                speechRecognizer.cancel()
-                speechRecognizer.destroy()
-            } catch (e: Exception) {
-                android.util.Log.e("DemoniTalk", "Error destroying speech recognizer", e)
-            }
+        if (speechRecognizer != null) return
+
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            Log.e("DemoniTalk", "Speech Recognition no disponible en este dispositivo")
+            return
         }
 
-        // ... rest of your logic
-
-        // Intentamos usar el reconocedor On-Device (Offline) si el sistema lo soporta (API 31+)
-        speechRecognizer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && SpeechRecognizer.isOnDeviceRecognitionAvailable(this)) {
-            SpeechRecognizer.createOnDeviceSpeechRecognizer(this)
-        } else {
-            SpeechRecognizer.createSpeechRecognizer(this)
+        Log.d("DemoniTalk", "Configurando SpeechRecognizer...")
+        try {
+            // Usamos applicationContext para mayor estabilidad en servicios
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(applicationContext)
+            speechRecognizer?.setRecognitionListener(speechListener)
+        } catch (e: Exception) {
+            Log.e("DemoniTalk", "Error al crear SpeechRecognizer: ${e.message}")
         }
+    }
 
-        speechRecognizer.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(params: Bundle?) {
-                isListening = true
-                if (!isContinuousMode && !isVigilanceMode) muteAudio(false)
-                val micButton = floatingView.findViewById<ImageView>(R.id.mic_button)
-                when {
-                    isVigilanceMode -> micButton.setBackgroundResource(R.drawable.bg_floating_button_vigilance)
-                    isContinuousMode -> micButton.setBackgroundResource(R.drawable.bg_floating_button_continuous)
-                    else -> micButton.setBackgroundResource(R.drawable.bg_floating_button_active)
-                }
-                if (!isContinuousMode && !isVigilanceMode) {
-                    Toast.makeText(this@FloatingButtonService, "Escuchando... 🎤", Toast.LENGTH_SHORT).show()
-                }
+    private val speechListener = object : RecognitionListener {
+        override fun onReadyForSpeech(params: Bundle?) {
+            Log.d("DemoniTalk", ">>> RECOGNIZER READY: ¡Habla ahora! <<<")
+            isListening = true
+            updateButtonUI()
+        }
+        override fun onBeginningOfSpeech() {
+            Log.d("DemoniTalk", ">>> EMPEZÓ A HABLAR <<<")
+        }
+        override fun onRmsChanged(rmsdB: Float) {}
+        override fun onBufferReceived(buffer: ByteArray?) {}
+        override fun onEndOfSpeech() {
+            Log.d("DemoniTalk", ">>> FIN DE VOZ DETECTADO <<<")
+            isListening = false
+            muteAudio(true)
+        }
+        override fun onError(error: Int) {
+            val message = when (error) {
+                SpeechRecognizer.ERROR_AUDIO -> "Error de audio"
+                SpeechRecognizer.ERROR_CLIENT -> "Error del cliente"
+                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Permisos insuficientes"
+                SpeechRecognizer.ERROR_NETWORK -> "Error de red"
+                SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Tiempo de espera de red agotado"
+                SpeechRecognizer.ERROR_NO_MATCH -> "No se encontró coincidencia (Silencio)"
+                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Reconocedor ocupado"
+                SpeechRecognizer.ERROR_SERVER -> "Error del servidor"
+                SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No se detectó voz"
+                else -> "Error desconocido: $error"
             }
-            override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(rmsdB: Float) {}
-            override fun onBufferReceived(buffer: ByteArray?) {}
-            override fun onEndOfSpeech() { 
-                isListening = false 
-                muteAudio(true)
+            Log.e("DemoniTalk", "!!! ERROR RECONOCIMIENTO [$error]: $message !!!")
+
+            isListening = false
+            muteAudio(false)
+            if (error == 9 || error == 5 || error == 3) {
+                Log.w("DemoniTalk", "Reiniciando SpeechRecognizer por error crítico...")
+                try { speechRecognizer?.destroy() } catch(e: Exception) {}
+                speechRecognizer = null
             }
-            override fun onError(error: Int) {
-                isListening = false
-                muteAudio(false)
-                android.util.Log.e("DemoniTalk", "Speech Error: $error")
-                if (isContinuousMode || isVigilanceMode) {
-                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                        if (isContinuousMode || isVigilanceMode) startListening()
-                    }, 1000)
-                } else {
-                    floatingView.findViewById<ImageView>(R.id.mic_button).setBackgroundResource(R.drawable.bg_floating_button)
-                }
+            if (isContinuousMode || isVigilanceMode) {
+                mainHandler.postDelayed({ if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) startListening() }, 1000)
+            } else {
+                isWaitingForCommandAfterWake = false; updateButtonUI()
             }
-            override fun onResults(results: Bundle?) {
-                isListening = false
-                muteAudio(false)
-                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+        }
+        override fun onResults(results: Bundle?) {
+            isListening = false
+            muteAudio(false)
+            val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+            Log.d("DemoniTalk", "Resultados obtenidos: $matches")
+
+            if (!matches.isNullOrEmpty()) {
+                val text = matches[0]
+                Log.i("DemoniTalk", "Texto reconocido: $text")
+                val result = commandHandler.execute(text, repository.loadCommands(), isVigilanceMode && !isWaitingForCommandAfterWake)
                 
-                if (!matches.isNullOrEmpty()) {
-                    val recognizedText = matches[0]
-                    android.util.Log.d("DemoniTalk", "Recognized: $recognizedText")
-                    
-                    val result = commandHandler.execute(recognizedText, repository.loadCommands(), requireWakeWord = isVigilanceMode)
-                    
-                    if (isVigilanceMode && result == CommandHandler.CommandResult.WakeWordOnly) {
-                        val responses = listOf(
-                            "¿Abrimos el Super?",
-                            "Que dice mi socio",
-                            "Dime, alma perdida",
-                            "como esta la cosa Bro",
-                            "Soy todo oídos, mortal",
-                            "Que dice mi Amo",
-                            "¿Necesitas que abra el portal?",
-                            "¿Qué sacrificio pides?",
-                            "Tus deseos son órdenes en el infierno", 
-                            "Habla, antes de que me arrepienta", 
-                            "Te escucho, pequeño humano",
-                            "¿Qué oscuridad traes hoy?",
-                            "Ordena, si te atreves"
-                        )
-                        val response = responses.random()
-                        
-                        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC), 0)
-                        
-                        val fallbackHandler = android.os.Handler(android.os.Looper.getMainLooper())
-                        val fallbackRunnable = Runnable {
-                            if (!isListening) {
-                                isVigilanceMode = false 
-                                startListening()
-                            }
-                        }
-                        fallbackHandler.postDelayed(fallbackRunnable, 2500)
-
-                        tts.speak(response, TextToSpeech.QUEUE_FLUSH, null, "DemoniWake")
-                        
-                        tts.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
-                            override fun onStart(utteranceId: String?) {}
-                            override fun onDone(utteranceId: String?) {
-                                fallbackHandler.removeCallbacks(fallbackRunnable)
-                                android.os.Handler(android.os.Looper.getMainLooper()).post {
-                                    isVigilanceMode = false
-                                    startListening()
-                                }
-                            }
-                            @Deprecated("Deprecated")
-                            override fun onError(utteranceId: String?) {
-                                fallbackHandler.removeCallbacks(fallbackRunnable)
-                                android.os.Handler(android.os.Looper.getMainLooper()).post { 
-                                    isVigilanceMode = false
-                                    startListening() 
-                                }
-                            }
-                        })
-                        return
-                    }
-                }
-
-                if (isContinuousMode || isVigilanceMode) {
-                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                        if (isContinuousMode || isVigilanceMode) startListening()
-                    }, 800)
-                } else {
-                    floatingView.findViewById<ImageView>(R.id.mic_button).setBackgroundResource(R.drawable.bg_floating_button)
+                if (isWaitingForCommandAfterWake) {
+                    isWaitingForCommandAfterWake = false
+                    isVigilanceMode = false
+                } else if (isVigilanceMode && result == CommandHandler.CommandResult.WakeWordOnly) {
+                    Log.d("DemoniTalk", "Wake word detectado, esperando comando...")
+                    handleWakeWordResponse()
+                    return
                 }
             }
-            override fun onPartialResults(partialResults: Bundle?) {}
-            override fun onEvent(eventType: Int, params: Bundle?) {}
-        })
+
+            isWaitingForCommandAfterWake = false
+            if (isContinuousMode || isVigilanceMode) {
+                mainHandler.postDelayed({ if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) startListening() }, 500)
+            } else { updateButtonUI() }
+        }
+        override fun onPartialResults(partialResults: Bundle?) {
+            val partial = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+            if (!partial.isNullOrEmpty()) {
+                Log.v("DemoniTalk", "Resultado parcial: ${partial[0]}")
+            }
+        }
+        override fun onEvent(eventType: Int, params: Bundle?) {}
     }
 
     private fun startListening() {
-        android.os.Handler(android.os.Looper.getMainLooper()).post {
-            if (isListening) return@post
+        if (isServiceDestroyed) return
+
+        mainHandler.post {
+            if (isListening) {
+                Log.w("DemoniTalk", "Intento de escuchar mientras ya se está escuchando. Cancelando sesión previa...")
+                try { speechRecognizer?.cancel() } catch(e: Exception) {}
+                isListening = false
+            }
+
             try {
                 setupSpeechRecognizer()
+                
+                if (speechRecognizer == null) {
+                    Log.e("DemoniTalk", "No se pudo iniciar escucha: SpeechRecognizer es NULL")
+                    return@post
+                }
+
+                // Limpiar cualquier estado previo antes de empezar
+                speechRecognizer?.cancel()
+
                 val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toString())
+                    putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
+                    // Quitamos temporalmente el modo offline para diagnosticar el Error 5
+                    // putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
                 }
+                
+                Log.d("DemoniTalk", ">>> LLAMANDO A startListening() <<<")
                 muteAudio(true)
-                speechRecognizer.startListening(intent)
+                speechRecognizer?.startListening(intent)
                 isListening = true
-                android.util.Log.d("DemoniTalk", "Microphone opened successfully")
             } catch (e: Exception) {
+                Log.e("DemoniTalk", "Error al iniciar captura de voz: ${e.message}")
                 isListening = false
-                android.util.Log.e("DemoniTalk", "StartListening failed", e)
+                muteAudio(false)
             }
         }
     }
 
+    private fun handleWakeWordResponse() {
+        if (isServiceDestroyed) return
+        isWaitingForCommandAfterWake = true
+        val response = listOf("¿Abrimos el Super?", "Que dice mi socio", "Dime", "como esta la cosa Bro", "Soy todo oídos", "Que dice mi Amo", "¿Necesitas algo?", "¿Qué sacrificio pides?", "Tus deseos son órdenes", "Habla", "Te escucho", "¿Qué hay?", "Ordena").random()
+        mainHandler.post { updateButtonUI() }
+        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(id: String?) { isListening = false }
+            override fun onDone(id: String?) { mainHandler.post { if (!isServiceDestroyed) startListening() } }
+            override fun onError(id: String?) { mainHandler.post { if (!isServiceDestroyed) startListening() } }
+        })
+        tts.speak(response, TextToSpeech.QUEUE_FLUSH, null, "DemoniWake")
+    }
+
     override fun onDestroy() {
+        isServiceDestroyed = true
         super.onDestroy()
-        if (::tts.isInitialized) {
-            tts.stop()
-            tts.shutdown()
-        }
-        if (::floatingView.isInitialized) windowManager.removeView(floatingView)
-        if (::speechRecognizer.isInitialized) speechRecognizer.destroy()
+        if (::tts.isInitialized) { tts.stop(); tts.shutdown() }
+        if (::floatingView.isInitialized) try { windowManager.removeView(floatingView) } catch(e: Exception) {}
+        speechRecognizer?.destroy(); speechRecognizer = null
     }
 }

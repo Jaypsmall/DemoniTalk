@@ -4,6 +4,7 @@ import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import java.io.File
+import androidx.core.content.edit
 
 class CommandRepository(private val context: Context) {
     private val gson = Gson()
@@ -13,7 +14,7 @@ class CommandRepository(private val context: Context) {
     private val EXPORT_PATH_KEY = "export_path"
 
     fun saveDarkMode(enabled: Boolean) {
-        prefs.edit().putBoolean(DARK_MODE_KEY, enabled).apply()
+        prefs.edit { putBoolean(DARK_MODE_KEY, enabled) }
     }
 
     fun isDarkMode(): Boolean {
@@ -21,7 +22,7 @@ class CommandRepository(private val context: Context) {
     }
 
     fun saveExportPath(path: String) {
-        prefs.edit().putString(EXPORT_PATH_KEY, path).apply()
+        prefs.edit { putString(EXPORT_PATH_KEY, path) }
     }
 
     fun getExportPath(): String {
@@ -29,11 +30,11 @@ class CommandRepository(private val context: Context) {
     }
 
     fun saveCommands(commands: List<VoiceCommand>) {
-        prefs.edit().putString(COMMANDS_KEY, gson.toJson(commands)).apply()
+        prefs.edit { putString(COMMANDS_KEY, gson.toJson(commands)) }
     }
 
     fun clearCache() {
-        prefs.edit().remove(COMMANDS_KEY).apply()
+        prefs.edit { remove(COMMANDS_KEY) }
     }
 
     fun getBackupFiles(): List<File> {
@@ -54,7 +55,7 @@ class CommandRepository(private val context: Context) {
             val type = object : TypeToken<List<VoiceCommand>>() {}.type
             try {
                 gson.fromJson<List<VoiceCommand>>(json, type)
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 getDefaultCommands()
             }
         }

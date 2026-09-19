@@ -1,25 +1,15 @@
 package com.example.demonitalk
 
 import android.content.Context
-import android.hardware.camera2.CameraManager
 import android.util.Log
 import java.text.Normalizer
+import java.util.Locale
 import java.util.regex.Pattern
 
-class CommandHandler(private val context: Context) {
+class CommandHandler(context: Context) {
 
-    private val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-    private var cameraId: String? = null
     private var internalListener: ((String) -> Unit)? = null
     private val accessibilityController = AccessibilityController(context)
-
-    init {
-        try {
-            cameraId = cameraManager.cameraIdList[0]
-        } catch (e: Exception) {
-            Log.e("CommandHandler", "Error getting camera ID", e)
-        }
-    }
 
     fun setInternalListener(listener: (String) -> Unit) {
         internalListener = listener
@@ -28,199 +18,155 @@ class CommandHandler(private val context: Context) {
     private fun String.normalize(): String {
         val nfdNormalizedString = Normalizer.normalize(this, Normalizer.Form.NFD)
         val pattern = Pattern.compile("\\p{InCombiningDiacriticalMarks}+")
-        val base = pattern.matcher(nfdNormalizedString).replaceAll("").lowercase().trim()
+        val base = pattern.matcher(nfdNormalizedString).replaceAll("").lowercase(Locale.getDefault()).trim()
 
-        // Mapeamos las palabras solicitadas a "maquina" para estandarizar el wake-word
-        return base.replace("demonio", "maquina")
+        return base
+            .replace("demonio", "maquina")
             .replace("demoni", "maquina")
             .replace("puta", "maquina")
             .replace("p***", "maquina")
+            .replace("demoni talk", "maquina")
     }
 
     private val wakeWords: List<String>
-        get() = listOf(
-            "hermano",
-            "amigo",
-            "maquina"
-            )
+        get() = listOf("hermano", "amigo", "maquina")
 
     fun execute(text: String, commands: List<VoiceCommand>, requireWakeWord: Boolean = false): CommandResult {
-        var normalizedText: String = text.normalize()
+        var normalizedText = text.normalize()
         var wakeWordDetected = false
-        
+
         if (requireWakeWord) {
-            val foundWakeWord = wakeWords.find { normalizedText.startsWith(it) }
+            val foundWakeWord = wakeWords.firstOrNull { wakeWord ->
+                normalizedText == wakeWord || normalizedText.startsWith("$wakeWord ")
+            }
+
             if (foundWakeWord != null) {
                 wakeWordDetected = true
-                // Quitamos la palabra de activación encontrada
                 normalizedText = normalizedText.removePrefix(foundWakeWord).trim()
-                Log.d("CommandHandler", "Wake-word '$foundWakeWord' detected! Remaining: '$normalizedText'")
+                Log.d("CommandHandler", "Wake-word '$foundWakeWord' detectado.")
             } else {
-                Log.d("CommandHandler", "Wake-word not found in vigilance mode.")
                 return CommandResult.Ignored
             }
         }
 
-        // Si solo se dijo la palabra mágica sin nada más
         if (wakeWordDetected && normalizedText.isEmpty()) {
             return CommandResult.WakeWordOnly
         }
 
-        // Caso especial para escribir mensajes
-        if (normalizedText.startsWith("manda este mensaje") || normalizedText.startsWith("escribe")) {
-            val content = normalizedText
-                .replace("manda este mensaje", "")
-                .replace("escribe", "")
-                .trim()
+        // --- COMANDOS RÁPIDOS NATIVOS ---
+
+        // Escribir
+        if (normalizedText.startsWith("escribe") || normalizedText.startsWith("manda este mensaje")) {
+            val content = normalizedText.replace("escribe", "").replace("manda este mensaje", "").trim()
             if (content.isNotEmpty()) {
-                Log.d("CommandHandler", "Executing type command: $content")
-                Thread { processAction("type:$content") }.start()
+                executeAsync("type:$content")
                 return CommandResult.Executed
             }
         }
 
-        // Caso: "envia el mensaje" o "dale a enviar"
-        if (normalizedText.contains("envia el mensaje") || normalizedText.contains("dale a enviar") || normalizedText == "enviar") {
-            Thread { processAction("click_send") }.start()
-            return CommandResult.Executed
-        }
-
-        // Caso: "abre la aplicacion [NOMBRE]" o "abre [NOMBRE]"
-        if (normalizedText.startsWith("abre la aplicacion") || normalizedText.startsWith("abre")) {
-            val appName = normalizedText
-                .replace("abre la aplicacion", "")
-                .replace("abre", "")
-                .trim()
+        // Abrir Apps
+        if (normalizedText.startsWith("abre") || normalizedText.startsWith("abrir")) {
+            val appName = normalizedText.replace("abre", "").replace("abrir", "").trim()
             if (appName.isNotEmpty()) {
-                Thread { processAction("open_app:$appName") }.start()
+                executeAsync("open_app:$appName")
                 return CommandResult.Executed
             }
         }
 
-        // Navegación básica
+        // Navegación y Control
         when (normalizedText) {
-            "vuelve atras", "atras" -> {
-                Thread { processAction("global_back") }.start()
-                return CommandResult.Executed
-            }
-            "ve a inicio", "pantalla de inicio", "vete a casa" -> {
-                Thread { processAction("global_home") }.start()
-                return CommandResult.Executed
-            }
-            "aplicaciones recientes", "recientes" -> {
-                Thread { processAction("global_recents") }.start()
-                return CommandResult.Executed
-            }
-            "abre el primer chat", "primer chat", "primer mensaje" -> {
-                Thread { processAction("click_first_chat") }.start()
-                return CommandResult.Executed
-            }
-            "desactivar escucha", "deja de escuchar", "para de escuchar", "silencio" -> {
-                internalListener?.invoke("internal_stop")
+            "vuelve atras", "atras" -> { executeAsync("global_back"); return CommandResult.Executed }
+            "inicio", "vete a casa" -> { executeAsync("global_home"); return CommandResult.Executed }
+            "recientes" -> { executeAsync("global_recents"); return CommandResult.Executed }
+            "enviar", "manda el mensaje" -> { executeAsync("click_send"); return CommandResult.Executed }
+            "cuadricula" -> { executeAsync("show_grid"); return CommandResult.Executed }
+            "numeros" -> { executeAsync("show_numbers"); return CommandResult.Executed }
+            "oculta todo", "limpia pantalla" -> { executeAsync("hide_overlays"); return CommandResult.Executed }
+            "silencio", "para de escuchar" -> { internalListener?.invoke("internal_stop"); return CommandResult.Executed }
+        }
+
+        // Click por número (Voice Access style)
+        val numberPattern = Pattern.compile(".*?(?:pulsa|clic|numero|el)\\s+(\\d+).*?")
+        val matcher = numberPattern.matcher(normalizedText)
+        if (matcher.find()) {
+            val num = matcher.group(1)
+            if (num != null) {
+                executeAsync("click_number:$num")
                 return CommandResult.Executed
             }
         }
 
-        Log.d("CommandHandler", "Searching for command in: '$normalizedText'")
-        
-        val command = commands.find { 
+        // Click por texto directo
+        if (normalizedText.startsWith("pulsa ")) {
+            val targetText = normalizedText.replace("pulsa ", "").trim()
+            if (targetText.isNotEmpty()) {
+                executeAsync("click_text:$targetText")
+                return CommandResult.Executed
+            }
+        }
+
+        // --- REPOSITORIO DE COMANDOS PERSONALIZADOS ---
+        val command = commands.firstOrNull {
             val trigger = it.trigger.normalize()
-            normalizedText == trigger || normalizedText.contains(trigger) || trigger.contains(normalizedText) ||
-            isFuzzyMatch(normalizedText, trigger)
+            normalizedText == trigger || normalizedText.contains(trigger) || isFuzzyMatch(normalizedText, trigger)
         }
 
-        return if (command != null) {
+        if (command != null) {
             if (command.action.startsWith("internal_")) {
                 internalListener?.invoke(command.action)
             } else {
-                Thread { processAction(command.action) }.start()
+                executeAsync(command.action)
             }
-            CommandResult.Executed
-        } else {
-            CommandResult.Ignored
+            return CommandResult.Executed
         }
-    }
 
-    enum class CommandResult {
-        Ignored,            // No se detectó nada relevante
-        WakeWordOnly,       // Se dijo "Demoni" pero nada más
-        Executed,           // Se ejecutó un comando (directo o tras wake-word)
+        return CommandResult.Ignored
     }
 
     private fun isFuzzyMatch(text: String, trigger: String): Boolean {
         if (text.length < 4 || trigger.length < 4) return false
-        // Si el trigger está contenido en un 80% o viceversa
-        return text.contains(trigger.substring(0, (trigger.length * 0.8).toInt()))
+        return text.contains(trigger.substring(0, (trigger.length * 0.7).toInt()))
+    }
+
+    private fun executeAsync(action: String) {
+        Thread { processAction(action) }.start()
     }
 
     private fun processAction(action: String) {
-        // Acciones inteligentes: si hay Root, usamos comandos de sistema que son más fiables
-        if (ShellUtils.isRootAvailable()) {
-            when (action) {
-                "global_back" -> {
-                    ShellUtils.executeCommand("input keyevent 4")
-                    return
-                }
-                "global_home" -> {
-                    ShellUtils.executeCommand("input keyevent 3")
-                    return
-                }
-                "global_recents" -> {
-                    ShellUtils.executeCommand("input keyevent 187")
-                    return
-                }
-                "click_send" -> {
-                    // Para enviar, primero intentamos por accesibilidad (es más preciso)
-                    // pero si falla o no está activo, no podemos hacer mucho más por shell simple
-                    accessibilityController.execute(action)
-                    return
-                }
-            }
-        }
+        val cleanAction = action.trim()
+        Log.d("CommandHandler", "Ejecutando acción: $cleanAction")
 
-        // Si no hay Root o es una acción específica, usamos el AccessibilityController
-        if (action.startsWith("open_app:") || 
-            action == "click_send" || 
-            action.startsWith("global_")) {
-            Log.d("CommandHandler", "Executing Smart Action: $action")
-            accessibilityController.execute(action)
+        if (cleanAction.startsWith("internal_")) {
+            internalListener?.invoke(cleanAction)
             return
         }
 
-        // Comandos internos de alta velocidad
-        when (action) {
-            "torch_on" -> {
-                toggleFlashlight(true)
-                return
-            }
-            "torch_off" -> {
-                toggleFlashlight(false)
-                return
-            }
-        }
-
+        // LÓGICA DE MOTOR: 1. Root (si está concedido) -> 2. Accesibilidad (Fallback)
+        var shellSuccess = false
         if (ShellUtils.isRootAvailable()) {
-            Log.d("CommandHandler", "Executing via Root: $action")
-            if (action.startsWith("type:")) {
-                val text = action.removePrefix("type:")
-                ShellUtils.executeCommand("input text \"$text\"")
-            } else {
-                ShellUtils.executeCommand(action)
+            shellSuccess = when {
+                cleanAction == "global_back" -> ShellUtils.executeCommand("input keyevent 4")
+                cleanAction == "global_home" -> ShellUtils.executeCommand("input keyevent 3")
+                cleanAction == "global_recents" -> ShellUtils.executeCommand("input keyevent 187")
+                cleanAction.startsWith("type:") -> {
+                    val text = cleanAction.removePrefix("type:")
+                    // Escapamos espacios para comando shell
+                    ShellUtils.executeCommand("input text \"${text.replace(" ", "%s")}\"")
+                }
+                else -> {
+                    // Si no es un comando predefinido, intentamos ejecutarlo directamente como shell
+                    if (!cleanAction.startsWith("open_app:") && !cleanAction.startsWith("click_")) {
+                        ShellUtils.executeCommand(cleanAction)
+                    } else false
+                }
             }
-        } else {
-            Log.d("CommandHandler", "Executing via Accessibility: $action")
-            accessibilityController.execute(action)
+        }
+
+        // Si el Root falló, no está disponible o la acción es exclusiva de Accesibilidad
+        if (!shellSuccess) {
+            accessibilityController.execute(cleanAction)
         }
     }
 
-    private fun toggleFlashlight(status: Boolean) {
-        try {
-            cameraId?.let {
-                cameraManager.setTorchMode(it, status)
-                Log.d("CommandHandler", "Flashlight set to $status")
-            }
-        } catch (e: Exception) {
-            Log.e("CommandHandler", "Error toggling flashlight", e)
-        }
-    }
+    enum class CommandResult { Ignored, WakeWordOnly, Executed }
 }
