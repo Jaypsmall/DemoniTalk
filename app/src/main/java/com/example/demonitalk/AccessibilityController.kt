@@ -111,7 +111,6 @@ class AccessibilityController(
                 cleanAction == "media_previous" -> sendMediaKey(android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS)
                 cleanAction == "media_pause" -> sendMediaKey(android.view.KeyEvent.KEYCODE_MEDIA_PAUSE)
                 cleanAction == "media_play" -> sendMediaKey(android.view.KeyEvent.KEYCODE_MEDIA_PLAY)
-
                 cleanAction == "show_grid" -> { service.showGrid(); true }
                 cleanAction == "show_numbers" -> { service.showNumbers(); true }
                 cleanAction == "hide_overlays" -> { service.hideOverlays(); true }
@@ -307,9 +306,22 @@ class AccessibilityController(
     }
 
     private fun sendMediaKey(keyCode: Int): Boolean {
-        // Intentar primero por Root para máxima compatibilidad
+        // Para YouTube Music y otros, a veces KEYCODE_MEDIA_PLAY (126) no funciona
+        // si la app está en "sleep". Probamos con un Broadcast de sistema vía ROOT.
         if (ShellUtils.isRootAvailable()) {
-            return ShellUtils.executeCommand("input keyevent $keyCode")
+            Log.d(TAG, "Enviando tecla media via ROOT: $keyCode")
+            
+            // Intentar el comando estándar
+            ShellUtils.executeCommand("input keyevent $keyCode")
+            
+            // Si es PLAY, enviamos un broadcast extra para despertar a los reproductores tercos
+            if (keyCode == android.view.KeyEvent.KEYCODE_MEDIA_PLAY) {
+                // Comando "bruto" para forzar el Play en Android
+                ShellUtils.executeCommand("am broadcast -a android.intent.action.MEDIA_BUTTON --ei android.intent.extra.KEY_EVENT $keyCode")
+                // Reintento con PLAY_PAUSE (a veces es el único que despierta a YT Music)
+                ShellUtils.executeCommand("input keyevent 85") 
+            }
+            return true
         }
 
         // Fallback: Enviar Intent de media

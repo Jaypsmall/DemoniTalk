@@ -759,6 +759,7 @@ class FloatingButtonService : Service() {
                 muteAudio(true)
             }
 
+            @SuppressLint("SwitchIntDef")
             override fun onError(
                 error: Int
             ) {

@@ -66,6 +66,22 @@ class CommandHandler(context: Context) {
     ): CommandResult {
 
         var normalizedText = text.normalize()
+        
+        // ---------------------------------------------------------
+        // SOPORTE MULTI-COMANDO
+        // Detectamos si hay conectores como " y " o " luego "
+        // ---------------------------------------------------------
+        val multiCommandRegex = Regex("""\s+(y|luego|después)\s+(?=abre|abrir|pulsa|clic|escribe|manda|pon|reproduce|vuelve|inicio|recientes|buscar|busca|enviar)""")
+        
+        if (normalizedText.contains(multiCommandRegex)) {
+            val parts = normalizedText.split(multiCommandRegex)
+            if (parts.size > 1) {
+                Log.d("CommandHandler", "Multi-comando detectado. Partes: $parts")
+                executeSequence(parts, commands)
+                return CommandResult.Executed
+            }
+        }
+
         var wakeWordDetected = false
 
         Log.d(
@@ -437,6 +453,53 @@ class CommandHandler(context: Context) {
         )
 
         return text.contains(prefix)
+    }
+
+    /**
+     * Ejecuta una serie de comandos uno tras otro con una pausa.
+     */
+    private fun executeSequence(parts: List<String>, commands: List<VoiceCommand>) {
+        Thread {
+            for (part in parts) {
+                val cleanPart = part.trim()
+                if (cleanPart.isNotEmpty()) {
+                    Log.d("CommandHandler", "Ejecutando parte de secuencia: $cleanPart")
+                    // Llamamos a execute de forma recursiva para cada parte, pero sin modo multi-comando
+                    // Para evitar bucles infinitos, procesamos la lógica de cada parte aquí.
+                    innerExecute(cleanPart, commands)
+                    
+                    // Pausa de 1.5 segundos entre comandos para que la UI cargue
+                    try { Thread.sleep(1500) } catch (_: Exception) {}
+                }
+            }
+        }.start()
+    }
+
+    /**
+     * Versión simplificada de execute para partes de una secuencia.
+     */
+    private fun innerExecute(text: String, commands: List<VoiceCommand>) {
+        // Esta lógica es igual a la de execute() pero sin wake word ni detección multi
+        val normalizedText = text.normalize()
+
+        // Aquí invocamos la misma lógica de los bloques when/if de execute()
+        // Para no duplicar código, en una refactorización real extraeríamos esto.
+        // Por ahora, procesamos los más importantes.
+        
+        when {
+            normalizedText.startsWith("abre ") -> processAction("open_app:${normalizedText.removePrefix("abre ").trim()}")
+            normalizedText.startsWith("escribe ") -> processAction("type:${normalizedText.removePrefix("escribe ").trim()}")
+            normalizedText.startsWith("pulsa ") -> processAction("click_text:${normalizedText.removePrefix("pulsa ").trim()}")
+            normalizedText == "enviar" -> processAction("click_send")
+            normalizedText == "inicio" -> processAction("global_home")
+            normalizedText == "vuelve atras" -> processAction("global_back")
+            
+            // Comandos de repositorio
+            else -> {
+                val command = commands.firstOrNull { it.trigger.normalize() == normalizedText || normalizedText.contains(it.trigger.normalize()) }
+                command?.let { processAction(it.action) }
+            }
+        }
     }
 
     /**
