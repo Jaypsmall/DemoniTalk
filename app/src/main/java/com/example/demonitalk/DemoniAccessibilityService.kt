@@ -1,11 +1,25 @@
 package com.example.demonitalk
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import java.util.Locale
 
 class DemoniAccessibilityService : AccessibilityService() {
+
+    private var speechRecognizer: SpeechRecognizer? = null
+    private lateinit var commandHandler: CommandHandler
+    private lateinit var repository: CommandRepository
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var isListening = false
 
     companion object {
         var instance: DemoniAccessibilityService? = null
@@ -14,6 +28,74 @@ class DemoniAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
+        commandHandler = CommandHandler(this)
+        repository = CommandRepository(this)
+        Log.d("DemoniTalk", "Accessibility Service Connected")
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val action = intent?.action
+        if (action == "ACTION_START_LISTENING") {
+            startListening()
+        } else if (action == "ACTION_STOP_LISTENING") {
+            stopListening()
+        }
+        return super.onStartCommand(intent, flags, startId)
+    }
+
+    private fun startListening() {
+        mainHandler.post {
+            if (isListening) return@post
+            
+            try {
+                if (speechRecognizer == null) {
+                    speechRecognizer = SpeechRecognizer.createSpeechRecognizer(applicationContext)
+                    speechRecognizer?.setRecognitionListener(speechListener)
+                }
+
+                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                    putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
+                }
+                speechRecognizer?.startListening(intent)
+                isListening = true
+                Log.d("DemoniTalk", "Accessibility-based listening started")
+            } catch (e: Exception) {
+                Log.e("DemoniTalk", "Error starting accessibility listening: ${e.message}")
+            }
+        }
+    }
+
+    private fun stopListening() {
+        mainHandler.post {
+            speechRecognizer?.stopListening()
+            isListening = false
+        }
+    }
+
+    private val speechListener = object : RecognitionListener {
+        override fun onReadyForSpeech(params: Bundle?) {}
+        override fun onBeginningOfSpeech() {}
+        override fun onRmsChanged(rmsdB: Float) {}
+        override fun onBufferReceived(buffer: ByteArray?) {}
+        override fun onEndOfSpeech() { isListening = false }
+        override fun onError(error: Int) {
+            isListening = false
+            Log.e("DemoniTalk", "Accessibility Speech Error: $error")
+            // Reintentar si es necesario (p.ej. en modo continuo)
+        }
+        override fun onResults(results: Bundle?) {
+            isListening = false
+            val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+            if (!matches.isNullOrEmpty()) {
+                val text = matches[0]
+                Log.i("DemoniTalk", "Accessibility recognized: $text")
+                commandHandler.execute(text, repository.loadCommands())
+            }
+        }
+        override fun onPartialResults(partialResults: Bundle?) {}
+        override fun onEvent(eventType: Int, params: Bundle?) {}
     }
 
     override fun onUnbind(intent: android.content.Intent?): Boolean {
@@ -137,5 +219,39 @@ class DemoniAccessibilityService : AccessibilityService() {
     private fun clickNodeOrParent(node: AccessibilityNodeInfo) {
         val target = if (node.isClickable) node else node.parent
         target?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+    }
+
+    fun clickText(targetText: String): Boolean {
+        val rootNode = rootInActiveWindow ?: return false
+        val nodes = rootNode.findAccessibilityNodeInfosByText(targetText)
+        for (node in nodes) {
+            if (isNodeOrParentClickable(node)) {
+                clickNodeOrParent(node)
+                return true
+            }
+        }
+        // Búsqueda difusa/recursiva si falla la directa
+        return findAndClickByTextOrDesc(rootNode, listOf(targetText.lowercase()))
+    }
+
+    fun clickNumber(number: String): Boolean {
+        // Por ahora simulamos la pulsación por número buscando el texto del número en pantalla
+        // En una versión más avanzada, asignaríamos IDs a los elementos visibles
+        return clickText(number)
+    }
+
+    fun showGrid() {
+        Log.d("DemoniTalk", "Mostrando cuadrícula de accesibilidad (Overlay)")
+        // TODO: Implementar vista de cuadrícula con WindowManager
+    }
+
+    fun showNumbers() {
+        Log.d("DemoniTalk", "Mostrando números de accesibilidad (Overlay)")
+        // TODO: Implementar vista de etiquetas numéricas
+    }
+
+    fun hideOverlays() {
+        Log.d("DemoniTalk", "Ocultando todos los overlays de accesibilidad")
+        // TODO: Eliminar vistas del WindowManager
     }
 }

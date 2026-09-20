@@ -263,6 +263,15 @@ class MainActivity : ComponentActivity() {
                 Column(modifier = Modifier.padding(padding).fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp)) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            DemoniButton(
+                                text = if (isEnglish) "(Accessibility)" else "(Accesibilidad)",
+                                containerColor = com.example.demonitalk.ui.theme.DemoniPurple,
+                                onClick = { checkAndOpenAccessibility() }
+                            )
+                        }
+                    }
+                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp)) {
                         Box(modifier = Modifier.weight(1f)) { DemoniButton(text = if (isEnglish) "Start Floating" else "Iniciar Botón", onClick = { startFloatingService() }) }
                         Spacer(modifier = Modifier.width(8.dp))
                         Box(modifier = Modifier.weight(1f)) { DemoniButton(text = if (isEnglish) "Request Root" else "Solicitar Root", containerColor = MaterialTheme.colorScheme.error, onClick = { requestRoot() }) }
@@ -435,5 +444,25 @@ class MainActivity : ComponentActivity() {
     private fun sendControlIntent(action: String) {
         val intent = Intent(this, FloatingButtonService::class.java).apply { this.action = action }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
+    }
+
+    private fun checkAndOpenAccessibility() {
+        if (!isAccessibilityEnabled()) {
+            Toast.makeText(this, "Habilita DemoniTalk en Accesibilidad", Toast.LENGTH_LONG).show()
+            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            startActivity(intent)
+        } else {
+            Toast.makeText(this, "Accesibilidad ya activada 😈", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun isAccessibilityEnabled(): Boolean {
+        val service = "$packageName/${DemoniAccessibilityService::class.java.canonicalName}"
+        val enabled = Settings.Secure.getInt(contentResolver, Settings.Secure.ACCESSIBILITY_ENABLED, 0)
+        if (enabled == 1) {
+            val settingValue = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+            return settingValue?.contains(service) == true
+        }
+        return false
     }
 }
