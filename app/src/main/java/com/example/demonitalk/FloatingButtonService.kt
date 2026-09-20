@@ -793,6 +793,9 @@ class FloatingButtonService : Service() {
                         SpeechRecognizer.ERROR_SPEECH_TIMEOUT ->
                             "No se detectó voz"
 
+                        12 ->
+                            "Idioma no soportado (Error 12)"
+
                         else ->
                             "Error desconocido: $error"
                     }
@@ -813,9 +816,9 @@ class FloatingButtonService : Service() {
                 if (
                     error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ||
                     error == SpeechRecognizer.ERROR_CLIENT ||
-                    error == SpeechRecognizer.ERROR_SERVER
+                    error == SpeechRecognizer.ERROR_SERVER ||
+                    error == 12
                 ) {
-
                     resetSpeechRecognizer()
                 }
 
@@ -1063,24 +1066,16 @@ class FloatingButtonService : Service() {
                             RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
                         )
 
+                        // Probamos con un tag de idioma más genérico
                         putExtra(
                             RecognizerIntent.EXTRA_LANGUAGE,
-                            Locale.getDefault().toString()
+                            "es"
                         )
 
                         putExtra(
                             RecognizerIntent.EXTRA_CALLING_PACKAGE,
                             packageName
                         )
-
-                        /*
-                         * No forzamos offline porque el código original
-                         * estaba diagnosticando errores de reconocimiento.
-                         */
-                        // putExtra(
-                        //     RecognizerIntent.EXTRA_PREFER_OFFLINE,
-                        //     true
-                        // )
                     }
 
                 Log.d(
