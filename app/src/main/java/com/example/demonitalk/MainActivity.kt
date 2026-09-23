@@ -231,7 +231,7 @@ class MainActivity : ComponentActivity() {
                         
                         Spacer(modifier = Modifier.weight(1f))
                         Column(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(text = "DemoniTalk v2.0.0", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (isDarkMode) AshGrey else Color.DarkGray)
+                            Text(text = "DemoniTalk v2.0.1", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (isDarkMode) AshGrey else Color.DarkGray)
                             Text(text = "Created by JAYLIZ with ❤️", fontSize = 9.sp, color = (if (isDarkMode) AshGrey else Color.DarkGray).copy(0.7f))
                         }
                     }
