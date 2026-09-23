@@ -1,7 +1,11 @@
 package com.example.demonitalk
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Context
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.Rect
+import android.graphics.Typeface
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -9,249 +13,1535 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
+import android.view.Gravity
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.FrameLayout
+import android.widget.TextView
 import java.util.Locale
 
 class DemoniAccessibilityService : AccessibilityService() {
 
+    // =========================================================
+    // VOZ
+    // =========================================================
+
     private var speechRecognizer: SpeechRecognizer? = null
     private lateinit var commandHandler: CommandHandler
     private lateinit var repository: CommandRepository
+
     private val mainHandler = Handler(Looper.getMainLooper())
+
     private var isListening = false
 
+    // =========================================================
+    // OVERLAYS
+    // =========================================================
+
+    private var windowManager: WindowManager? = null
+
+    private var gridOverlay: FrameLayout? = null
+    private var numbersOverlay: FrameLayout? = null
+
+    private var gridVisible = false
+    private var numbersVisible = false
+
+    /**
+     * Relación:
+     *
+     * número -> AccessibilityNodeInfo
+     *
+     * Ejemplo:
+     *
+     * 1 -> botón WhatsApp
+     * 2 -> botón Ajustes
+     * 3 -> botón YouTube
+     */
+    private val numberedNodes =
+        mutableMapOf<Int, AccessibilityNodeInfo>()
+
+    /**
+     * Guardamos también los rectángulos para poder dibujar
+     * las etiquetas exactamente sobre los elementos.
+     */
+    private val numberedBounds =
+        mutableMapOf<Int, Rect>()
+
+    // =========================================================
+    // INSTANCE
+    // =========================================================
+
     companion object {
+
+        private const val TAG = "DemoniTalk"
+
         var instance: DemoniAccessibilityService? = null
     }
 
+    // =========================================================
+    // SERVICE CONNECTED
+    // =========================================================
+
     override fun onServiceConnected() {
         super.onServiceConnected()
+
         instance = this
+
         commandHandler = CommandHandler(this)
         repository = CommandRepository(this)
-        Log.d("DemoniTalk", "Accessibility Service Connected")
+
+        windowManager =
+            getSystemService(Context.WINDOW_SERVICE) as WindowManager
+
+        Log.d(TAG, "Accessibility Service Connected")
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    // =========================================================
+    // START / STOP LISTENING
+    // =========================================================
+
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int
+    ): Int {
+
         val action = intent?.action
-        if (action == "ACTION_START_LISTENING") {
-            startListening()
-        } else if (action == "ACTION_STOP_LISTENING") {
-            stopListening()
+
+        when (action) {
+
+            "ACTION_START_LISTENING" -> {
+                startListening()
+            }
+
+            "ACTION_STOP_LISTENING" -> {
+                stopListening()
+            }
         }
+
         return super.onStartCommand(intent, flags, startId)
     }
 
     private fun startListening() {
+
         mainHandler.post {
-            if (isListening) return@post
-            
+
+            if (isListening) {
+                return@post
+            }
+
             try {
+
                 if (speechRecognizer == null) {
-                    speechRecognizer = SpeechRecognizer.createSpeechRecognizer(applicationContext)
-                    speechRecognizer?.setRecognitionListener(speechListener)
+
+                    speechRecognizer =
+                        SpeechRecognizer.createSpeechRecognizer(
+                            applicationContext
+                        )
+
+                    speechRecognizer?.setRecognitionListener(
+                        speechListener
+                    )
                 }
 
-                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-                    putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
-                }
+                val intent =
+                    Intent(
+                        RecognizerIntent.ACTION_RECOGNIZE_SPEECH
+                    ).apply {
+
+                        putExtra(
+                            RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+                        )
+
+                        putExtra(
+                            RecognizerIntent.EXTRA_LANGUAGE,
+                            Locale.getDefault()
+                        )
+
+                        putExtra(
+                            RecognizerIntent.EXTRA_CALLING_PACKAGE,
+                            packageName
+                        )
+                    }
+
                 speechRecognizer?.startListening(intent)
+
                 isListening = true
-                Log.d("DemoniTalk", "Accessibility-based listening started")
+
+                Log.d(
+                    TAG,
+                    "Accessibility-based listening started"
+                )
+
             } catch (e: Exception) {
-                Log.e("DemoniTalk", "Error starting accessibility listening: ${e.message}")
+
+                Log.e(
+                    TAG,
+                    "Error starting accessibility listening",
+                    e
+                )
             }
         }
     }
 
     private fun stopListening() {
+
         mainHandler.post {
-            speechRecognizer?.stopListening()
+
+            try {
+                speechRecognizer?.stopListening()
+            } catch (_: Exception) {
+            }
+
             isListening = false
         }
     }
 
-    private val speechListener = object : RecognitionListener {
-        override fun onReadyForSpeech(params: Bundle?) {}
-        override fun onBeginningOfSpeech() {}
-        override fun onRmsChanged(rmsdB: Float) {}
-        override fun onBufferReceived(buffer: ByteArray?) {}
-        override fun onEndOfSpeech() { isListening = false }
-        override fun onError(error: Int) {
-            isListening = false
-            Log.e("DemoniTalk", "Accessibility Speech Error: $error")
-            // Reintentar si es necesario (p.ej. en modo continuo)
-        }
-        override fun onResults(results: Bundle?) {
-            isListening = false
-            val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-            if (!matches.isNullOrEmpty()) {
-                val text = matches[0]
-                Log.i("DemoniTalk", "Accessibility recognized: $text")
-                commandHandler.execute(text, repository.loadCommands())
+    // =========================================================
+    // SPEECH LISTENER
+    // =========================================================
+
+    private val speechListener =
+        object : RecognitionListener {
+
+            override fun onReadyForSpeech(
+                params: Bundle?
+            ) {
+            }
+
+            override fun onBeginningOfSpeech() {
+            }
+
+            override fun onRmsChanged(
+                rmsdB: Float
+            ) {
+            }
+
+            override fun onBufferReceived(
+                buffer: ByteArray?
+            ) {
+            }
+
+            override fun onEndOfSpeech() {
+
+                isListening = false
+            }
+
+            override fun onError(
+                error: Int
+            ) {
+
+                isListening = false
+
+                Log.e(
+                    TAG,
+                    "Accessibility Speech Error: $error"
+                )
+            }
+
+            override fun onResults(
+                results: Bundle?
+            ) {
+
+                isListening = false
+
+                val matches =
+                    results?.getStringArrayList(
+                        SpeechRecognizer.RESULTS_RECOGNITION
+                    )
+
+                if (!matches.isNullOrEmpty()) {
+
+                    val text = matches[0]
+
+                    Log.i(
+                        TAG,
+                        "Accessibility recognized: $text"
+                    )
+
+                    commandHandler.execute(
+                        text,
+                        repository.loadCommands()
+                    )
+                }
+            }
+
+            override fun onPartialResults(
+                partialResults: Bundle?
+            ) {
+            }
+
+            override fun onEvent(
+                eventType: Int,
+                params: Bundle?
+            ) {
             }
         }
-        override fun onPartialResults(partialResults: Bundle?) {}
-        override fun onEvent(eventType: Int, params: Bundle?) {}
-    }
 
-    override fun onUnbind(intent: android.content.Intent?): Boolean {
+    // =========================================================
+    // UNBIND
+    // =========================================================
+
+    override fun onUnbind(
+        intent: Intent?
+    ): Boolean {
+
+        hideOverlays()
+
         instance = null
+
         return super.onUnbind(intent)
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
+    // =========================================================
+    // ACCESSIBILITY EVENTS
+    // =========================================================
 
-    override fun onInterrupt() {}
+    override fun onAccessibilityEvent(
+        event: AccessibilityEvent?
+    ) {
 
-    fun typeText(text: String): Boolean {
-        val rootNode = rootInActiveWindow ?: return false
-        val focusedNode = rootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return false
-        
-        val arguments = Bundle()
-        arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
-        return focusedNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
+        if (event == null) {
+            return
+        }
+
+        /*
+         * Si tenemos números visibles y cambia la pantalla,
+         * actualizamos las posiciones.
+         *
+         * Se usa un pequeño retraso para dejar que Android
+         * termine de construir la nueva jerarquía.
+         */
+
+        if (numbersVisible || gridVisible) {
+
+            mainHandler.removeCallbacksAndMessages(
+                NUMBER_REFRESH_TOKEN
+            )
+
+            mainHandler.postAtTime(
+                {
+                    refreshOverlays()
+                },
+                NUMBER_REFRESH_TOKEN,
+                150L
+            )
+        }
     }
+
+    override fun onInterrupt() {
+    }
+
+    // =========================================================
+    // ESCRIBIR TEXTO
+    // =========================================================
+
+    fun typeText(
+        text: String
+    ): Boolean {
+
+        val rootNode =
+            rootInActiveWindow
+                ?: return false
+
+        val focusedNode =
+            rootNode.findFocus(
+                AccessibilityNodeInfo.FOCUS_INPUT
+            )
+                ?: return false
+
+        val arguments =
+            Bundle()
+
+        arguments.putCharSequence(
+            AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+            text
+        )
+
+        return focusedNode.performAction(
+            AccessibilityNodeInfo.ACTION_SET_TEXT,
+            arguments
+        )
+    }
+
+    // =========================================================
+    // CLICK SEND
+    // =========================================================
 
     fun clickSendButton(): Boolean {
-        val rootNode = rootInActiveWindow ?: return false
-        
-        // 1. Intentar por IDs conocidos de apps populares
-        val commonIds = listOf(
-            "com.whatsapp:id/send",
-            "com.google.android.apps.messaging:id/send_message_button_container"
-        )
-        
+
+        val rootNode =
+            rootInActiveWindow
+                ?: return false
+
+        val commonIds =
+            listOf(
+                "com.whatsapp:id/send",
+                "com.google.android.apps.messaging:id/send_message_button_container"
+            )
+
         for (id in commonIds) {
-            val nodes = rootNode.findAccessibilityNodeInfosByViewId(id)
+
+            val nodes =
+                rootNode.findAccessibilityNodeInfosByViewId(id)
+
             for (node in nodes) {
-                if (node.isClickable || node.parent?.isClickable == true) {
-                    val target = if (node.isClickable) node else node.parent
-                    target?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+
+                if (
+                    node.isClickable ||
+                    node.parent?.isClickable == true
+                ) {
+
+                    val target =
+                        if (node.isClickable) {
+                            node
+                        } else {
+                            node.parent
+                        }
+
+                    if (
+                        target?.performAction(
+                            AccessibilityNodeInfo.ACTION_CLICK
+                        ) == true
+                    ) {
+                        return true
+                    }
+                }
+            }
+        }
+
+        val sendWords =
+            listOf(
+                "enviar",
+                "send",
+                "mandar",
+                "enviar mensaje",
+                "post",
+                "publicar"
+            )
+
+        return findAndClickByTextOrDesc(
+            rootNode,
+            sendWords
+        )
+    }
+
+    // =========================================================
+    // FIND CLICKABLE BY TEXT / DESCRIPTION
+    // =========================================================
+
+    private fun findAndClickByTextOrDesc(
+        node: AccessibilityNodeInfo,
+        words: List<String>
+    ): Boolean {
+
+        val desc =
+            node.contentDescription
+                ?.toString()
+                ?.lowercase(Locale.getDefault())
+                ?: ""
+
+        val text =
+            node.text
+                ?.toString()
+                ?.lowercase(Locale.getDefault())
+                ?: ""
+
+        for (word in words) {
+
+            if (
+                (desc.contains(word) || text.contains(word)) &&
+                (
+                        node.isClickable ||
+                                node.parent?.isClickable == true
+                        )
+            ) {
+
+                val target =
+                    if (node.isClickable) {
+                        node
+                    } else {
+                        node.parent
+                    }
+
+                if (
+                    target?.performAction(
+                        AccessibilityNodeInfo.ACTION_CLICK
+                    ) == true
+                ) {
                     return true
                 }
             }
         }
 
-        // 2. Intentar por descripción de contenido (iconos) o texto
-        val sendWords = listOf("enviar", "send", "mandar", "enviar mensaje", "post", "publicar")
-        return findAndClickByTextOrDesc(rootNode, sendWords)
-    }
+        for (i in 0 until node.childCount) {
 
-    private fun findAndClickByTextOrDesc(node: AccessibilityNodeInfo, words: List<String>): Boolean {
-        val desc = node.contentDescription?.toString()?.lowercase() ?: ""
-        val text = node.text?.toString()?.lowercase() ?: ""
-        
-        for (word in words) {
-            if ((desc.contains(word) || text.contains(word)) && (node.isClickable || node.parent?.isClickable == true)) {
-                val target = if (node.isClickable) node else node.parent
-                target?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            val child =
+                node.getChild(i)
+
+            if (
+                child != null &&
+                findAndClickByTextOrDesc(
+                    child,
+                    words
+                )
+            ) {
                 return true
             }
         }
-        
-        for (i in 0 until node.childCount) {
-            val child = node.getChild(i)
-            if (child != null && findAndClickByTextOrDesc(child, words)) return true
-        }
+
         return false
     }
 
-    fun performBack() = performGlobalAction(GLOBAL_ACTION_BACK)
-    fun performHome() = performGlobalAction(GLOBAL_ACTION_HOME)
-    fun performRecents() = performGlobalAction(GLOBAL_ACTION_RECENTS)
+    // =========================================================
+    // GLOBAL NAVIGATION
+    // =========================================================
+
+    fun performBack(): Boolean =
+        performGlobalAction(
+            GLOBAL_ACTION_BACK
+        )
+
+    fun performHome(): Boolean =
+        performGlobalAction(
+            GLOBAL_ACTION_HOME
+        )
+
+    fun performRecents(): Boolean =
+        performGlobalAction(
+            GLOBAL_ACTION_RECENTS
+        )
+
+    // =========================================================
+    // FIRST CONVERSATION
+    // =========================================================
 
     fun clickFirstConversation(): Boolean {
-        val rootNode = rootInActiveWindow ?: return false
-        
-        // 1. Intentar por IDs conocidos
-        val listIds = listOf(
-            "com.whatsapp:id/conversations_list",
-            "android:id/list",
-            "org.telegram.messenger:id/chats_list"
-        )
-        
+
+        val rootNode =
+            rootInActiveWindow
+                ?: return false
+
+        val listIds =
+            listOf(
+                "com.whatsapp:id/conversations_list",
+                "android:id/list",
+                "org.telegram.messenger:id/chats_list"
+            )
+
         for (id in listIds) {
-            val nodes = rootNode.findAccessibilityNodeInfosByViewId(id)
+
+            val nodes =
+                rootNode.findAccessibilityNodeInfosByViewId(id)
+
             for (node in nodes) {
-                if (clickFirstChild(node)) return true
-            }
-        }
 
-        // 2. Si fallan los IDs, buscar cualquier lista (ListView o RecyclerView)
-        return findAndClickFirstListElement(rootNode)
-    }
-
-    private fun findAndClickFirstListElement(node: AccessibilityNodeInfo): Boolean {
-        if (node.className?.contains("ListView") == true || node.className?.contains("RecyclerView") == true) {
-            if (clickFirstChild(node)) return true
-        }
-        
-        for (i in 0 until node.childCount) {
-            val child = node.getChild(i) ?: continue
-            if (findAndClickFirstListElement(child)) return true
-        }
-        return false
-    }
-
-    private fun clickFirstChild(listNode: AccessibilityNodeInfo): Boolean {
-        if (listNode.childCount > 0) {
-            for (i in 0 until listNode.childCount) {
-                val child = listNode.getChild(i) ?: continue
-                // En las listas, a veces el primer hijo es un header o algo no clicable.
-                // Buscamos el primero que sea clicable o tenga contenido útil.
-                if (isNodeOrParentClickable(child)) {
-                    clickNodeOrParent(child)
+                if (clickFirstChild(node)) {
                     return true
                 }
             }
         }
-        return false
+
+        return findAndClickFirstListElement(
+            rootNode
+        )
     }
 
-    private fun isNodeOrParentClickable(node: AccessibilityNodeInfo): Boolean {
-        return node.isClickable || node.parent?.isClickable == true
-    }
+    private fun findAndClickFirstListElement(
+        node: AccessibilityNodeInfo
+    ): Boolean {
 
-    private fun clickNodeOrParent(node: AccessibilityNodeInfo) {
-        val target = if (node.isClickable) node else node.parent
-        target?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-    }
+        val className =
+            node.className?.toString()
+                ?: ""
 
-    fun clickText(targetText: String): Boolean {
-        val rootNode = rootInActiveWindow ?: return false
-        val nodes = rootNode.findAccessibilityNodeInfosByText(targetText)
-        for (node in nodes) {
-            if (isNodeOrParentClickable(node)) {
-                clickNodeOrParent(node)
+        if (
+            className.contains("ListView") ||
+            className.contains("RecyclerView")
+        ) {
+
+            if (clickFirstChild(node)) {
                 return true
             }
         }
-        // Búsqueda difusa/recursiva si falla la directa
-        return findAndClickByTextOrDesc(rootNode, listOf(targetText.lowercase()))
+
+        for (i in 0 until node.childCount) {
+
+            val child =
+                node.getChild(i)
+                    ?: continue
+
+            if (
+                findAndClickFirstListElement(
+                    child
+                )
+            ) {
+                return true
+            }
+        }
+
+        return false
     }
 
-    fun clickNumber(number: String): Boolean {
-        // Por ahora simulamos la pulsación por número buscando el texto del número en pantalla
-        // En una versión más avanzada, asignaríamos IDs a los elementos visibles
-        return clickText(number)
+    private fun clickFirstChild(
+        listNode: AccessibilityNodeInfo
+    ): Boolean {
+
+        if (listNode.childCount <= 0) {
+            return false
+        }
+
+        for (i in 0 until listNode.childCount) {
+
+            val child =
+                listNode.getChild(i)
+                    ?: continue
+
+            if (isNodeOrParentClickable(child)) {
+
+                clickNodeOrParent(child)
+
+                return true
+            }
+        }
+
+        return false
     }
+
+    private fun isNodeOrParentClickable(
+        node: AccessibilityNodeInfo
+    ): Boolean {
+
+        return node.isClickable ||
+                node.parent?.isClickable == true
+    }
+
+    private fun clickNodeOrParent(
+        node: AccessibilityNodeInfo
+    ) {
+
+        val target =
+            if (node.isClickable) {
+                node
+            } else {
+                node.parent
+            }
+
+        target?.performAction(
+            AccessibilityNodeInfo.ACTION_CLICK
+        )
+    }
+
+    // =========================================================
+    // CLICK TEXT
+    // =========================================================
+
+    fun clickText(
+        targetText: String
+    ): Boolean {
+
+        val rootNode =
+            rootInActiveWindow
+                ?: return false
+
+        val nodes =
+            rootNode.findAccessibilityNodeInfosByText(
+                targetText
+            )
+
+        for (node in nodes) {
+
+            if (isNodeOrParentClickable(node)) {
+
+                clickNodeOrParent(node)
+
+                return true
+            }
+        }
+
+        return findAndClickByTextOrDesc(
+            rootNode,
+            listOf(
+                targetText.lowercase(
+                    Locale.getDefault()
+                )
+            )
+        )
+    }
+
+    // =========================================================
+    // CLICK NUMBER
+    // =========================================================
+
+    fun clickNumber(
+        number: String
+    ): Boolean {
+
+        val num =
+            number
+                .trim()
+                .toIntOrNull()
+                ?: return false
+
+        Log.d(
+            TAG,
+            "Intentando pulsar número: $num"
+        )
+
+        /*
+         * Primero usamos el mapa creado por showNumbers().
+         */
+
+        val storedNode =
+            numberedNodes[num]
+
+        if (storedNode != null) {
+
+            try {
+
+                if (
+                    storedNode.isVisibleToUser &&
+                    (
+                            storedNode.isClickable ||
+                                    storedNode.parent?.isClickable == true
+                            )
+                ) {
+
+                    val target =
+                        if (storedNode.isClickable) {
+                            storedNode
+                        } else {
+                            storedNode.parent
+                        }
+
+                    if (
+                        target?.performAction(
+                            AccessibilityNodeInfo.ACTION_CLICK
+                        ) == true
+                    ) {
+
+                        Log.d(
+                            TAG,
+                            "Número $num pulsado mediante AccessibilityNodeInfo"
+                        )
+
+                        return true
+                    }
+                }
+
+            } catch (e: Exception) {
+
+                Log.e(
+                    TAG,
+                    "Error pulsando nodo número $num",
+                    e
+                )
+            }
+        }
+
+        /*
+         * Si el nodo anterior ya no es válido porque cambió
+         * la pantalla, reconstruimos los números.
+         */
+
+        rebuildNumberMap()
+
+        val refreshedNode =
+            numberedNodes[num]
+
+        if (refreshedNode != null) {
+
+            try {
+
+                val target =
+                    if (refreshedNode.isClickable) {
+                        refreshedNode
+                    } else {
+                        refreshedNode.parent
+                    }
+
+                if (
+                    target?.performAction(
+                        AccessibilityNodeInfo.ACTION_CLICK
+                    ) == true
+                ) {
+
+                    Log.d(
+                        TAG,
+                        "Número $num pulsado tras refrescar mapa"
+                    )
+
+                    return true
+                }
+
+            } catch (e: Exception) {
+
+                Log.e(
+                    TAG,
+                    "Error pulsando número refrescado $num",
+                    e
+                )
+            }
+        }
+
+        /*
+         * Último fallback:
+         * buscar literalmente el número como texto.
+         */
+
+        Log.d(
+            TAG,
+            "Fallback: buscando texto '$num'"
+        )
+
+        return clickText(
+            num.toString()
+        )
+    }
+
+    // =========================================================
+    // SHOW GRID
+    // =========================================================
 
     fun showGrid() {
-        Log.d("DemoniTalk", "Mostrando cuadrícula de accesibilidad (Overlay)")
-        // TODO: Implementar vista de cuadrícula con WindowManager
+
+        mainHandler.post {
+
+            Log.d(
+                TAG,
+                "Mostrando cuadrícula de accesibilidad"
+            )
+
+            gridVisible = true
+
+            ensureGridOverlay()
+
+            gridOverlay?.visibility =
+                FrameLayout.VISIBLE
+
+            refreshOverlays()
+        }
     }
+
+    // =========================================================
+    // SHOW NUMBERS
+    // =========================================================
 
     fun showNumbers() {
-        Log.d("DemoniTalk", "Mostrando números de accesibilidad (Overlay)")
-        // TODO: Implementar vista de etiquetas numéricas
+
+        mainHandler.post {
+
+            Log.d(
+                TAG,
+                "Mostrando números de accesibilidad"
+            )
+
+            numbersVisible = true
+
+            rebuildNumberMap()
+
+            ensureNumbersOverlay()
+
+            numbersOverlay?.visibility =
+                FrameLayout.VISIBLE
+
+            refreshOverlays()
+        }
     }
 
+    // =========================================================
+    // HIDE ALL
+    // =========================================================
+
     fun hideOverlays() {
-        Log.d("DemoniTalk", "Ocultando todos los overlays de accesibilidad")
-        // TODO: Eliminar vistas del WindowManager
+
+        mainHandler.post {
+
+            Log.d(
+                TAG,
+                "Ocultando todos los overlays"
+            )
+
+            gridVisible = false
+            numbersVisible = false
+
+            numberedNodes.clear()
+            numberedBounds.clear()
+
+            removeGridOverlay()
+            removeNumbersOverlay()
+        }
+    }
+
+    // =========================================================
+    // REFRESH OVERLAYS
+    // =========================================================
+
+    private fun refreshOverlays() {
+
+        mainHandler.post {
+
+            if (numbersVisible) {
+
+                rebuildNumberMap()
+
+                ensureNumbersOverlay()
+
+                drawNumbers()
+            }
+
+            if (gridVisible) {
+
+                ensureGridOverlay()
+
+                drawGrid()
+            }
+        }
+    }
+
+    // =========================================================
+    // BUILD NUMBER MAP
+    // =========================================================
+
+    private fun rebuildNumberMap() {
+
+        numberedNodes.clear()
+        numberedBounds.clear()
+
+        val root =
+            rootInActiveWindow
+                ?: return
+
+        val candidates =
+            mutableListOf<AccessibilityNodeInfo>()
+
+        collectClickableNodes(
+            root,
+            candidates
+        )
+
+        /*
+         * Eliminamos elementos que no tengan una posición
+         * válida o que no sean visibles.
+         */
+
+        val valid =
+            candidates.filter { node ->
+
+                if (!node.isVisibleToUser) {
+                    return@filter false
+                }
+
+                val rect =
+                    Rect()
+
+                node.getBoundsInScreen(rect)
+
+                rect.width() > 0 &&
+                        rect.height() > 0
+            }
+
+        /*
+         * Orden aproximado:
+         *
+         * arriba -> abajo
+         * izquierda -> derecha
+         */
+
+        val sorted =
+            valid.sortedWith(
+                compareBy<AccessibilityNodeInfo> {
+
+                    val rect =
+                        Rect()
+
+                    it.getBoundsInScreen(rect)
+
+                    rect.top
+
+                }.thenBy {
+
+                    val rect =
+                        Rect()
+
+                    it.getBoundsInScreen(rect)
+
+                    rect.left
+                }
+            )
+
+        var number = 1
+
+        for (node in sorted) {
+
+            /*
+             * Evitar asignar varios números a nodos
+             * que representan exactamente el mismo elemento.
+             */
+
+            val rect =
+                Rect()
+
+            node.getBoundsInScreen(rect)
+
+            val duplicate =
+                numberedBounds.values.any {
+                    it == rect
+                }
+
+            if (duplicate) {
+                continue
+            }
+
+            numberedNodes[number] =
+                node
+
+            numberedBounds[number] =
+                Rect(rect)
+
+            number++
+
+            /*
+             * Límite de seguridad para no crear cientos
+             * de etiquetas en interfaces enormes.
+             */
+
+            if (number > 99) {
+                break
+            }
+        }
+
+        Log.d(
+            TAG,
+            "Elementos numerados: ${numberedNodes.size}"
+        )
+    }
+
+    // =========================================================
+    // COLLECT CLICKABLE NODES
+    // =========================================================
+
+    private fun collectClickableNodes(
+        node: AccessibilityNodeInfo,
+        result: MutableList<AccessibilityNodeInfo>
+    ) {
+
+        try {
+
+            if (
+                node.isVisibleToUser &&
+                (
+                        node.isClickable ||
+                                node.isLongClickable
+                        )
+            ) {
+
+                result.add(node)
+            }
+
+            for (i in 0 until node.childCount) {
+
+                val child =
+                    node.getChild(i)
+                        ?: continue
+
+                collectClickableNodes(
+                    child,
+                    result
+                )
+            }
+
+        } catch (e: Exception) {
+
+            Log.e(
+                TAG,
+                "Error recorriendo AccessibilityNodeInfo",
+                e
+            )
+        }
+    }
+
+    // =========================================================
+    // GRID OVERLAY
+    // =========================================================
+
+    private fun ensureGridOverlay() {
+
+        if (gridOverlay != null) {
+            return
+        }
+
+        val wm =
+            windowManager
+                ?: return
+
+        val overlay =
+            FrameLayout(this)
+
+        overlay.setBackgroundColor(
+            Color.TRANSPARENT
+        )
+
+        val params =
+            createOverlayParams()
+
+        try {
+
+            wm.addView(
+                overlay,
+                params
+            )
+
+            gridOverlay =
+                overlay
+
+        } catch (e: Exception) {
+
+            Log.e(
+                TAG,
+                "No se pudo crear overlay de cuadrícula",
+                e
+            )
+        }
+    }
+
+    // =========================================================
+    // DRAW GRID
+    // =========================================================
+
+    private fun drawGrid() {
+
+        val overlay =
+            gridOverlay
+                ?: return
+
+        overlay.removeAllViews()
+
+        val density =
+            resources.displayMetrics.density
+
+        val screenWidth =
+            resources.displayMetrics.widthPixels
+
+        val screenHeight =
+            resources.displayMetrics.heightPixels
+
+        /*
+         * Cuadrícula 4 x 4.
+         */
+
+        val columns = 4
+        val rows = 4
+
+        val cellWidth =
+            screenWidth / columns
+
+        val cellHeight =
+            screenHeight / rows
+
+        /*
+         * Dibujamos líneas verticales.
+         */
+
+        for (column in 1 until columns) {
+
+            val line =
+                ViewLine(
+                    this,
+                    Color.argb(
+                        150,
+                        255,
+                        0,
+                        0
+                    )
+                )
+
+            val params =
+                FrameLayout.LayoutParams(
+                    dp(1),
+                    screenHeight
+                )
+
+            params.leftMargin =
+                column * cellWidth
+
+            overlay.addView(
+                line,
+                params
+            )
+        }
+
+        /*
+         * Líneas horizontales.
+         */
+
+        for (row in 1 until rows) {
+
+            val line =
+                ViewLine(
+                    this,
+                    Color.argb(
+                        150,
+                        255,
+                        0,
+                        0
+                    )
+                )
+
+            val params =
+                FrameLayout.LayoutParams(
+                    screenWidth,
+                    dp(1)
+                )
+
+            params.topMargin =
+                row * cellHeight
+
+            overlay.addView(
+                line,
+                params
+            )
+        }
+
+        /*
+         * Bordes.
+         */
+
+        val border =
+            ViewLine(
+                this,
+                Color.argb(
+                    180,
+                    255,
+                    0,
+                    0
+                )
+            )
+
+        val borderParams =
+            FrameLayout.LayoutParams(
+                screenWidth,
+                dp(2)
+            )
+
+        overlay.addView(
+            border,
+            borderParams
+        )
+
+        val bottomBorder =
+            ViewLine(
+                this,
+                Color.argb(
+                    180,
+                    255,
+                    0,
+                    0
+                )
+            )
+
+        val bottomParams =
+            FrameLayout.LayoutParams(
+                screenWidth,
+                dp(2)
+            )
+
+        bottomParams.topMargin =
+            screenHeight - dp(2)
+
+        overlay.addView(
+            bottomBorder,
+            bottomParams
+        )
+
+        /*
+         * No usamos realmente density para el tamaño de las
+         * celdas, ya que screenWidth/screenHeight están en píxeles.
+         * Se mantiene solamente para el grosor de las líneas.
+         */
+    }
+
+    // =========================================================
+    // NUMBERS OVERLAY
+    // =========================================================
+
+    private fun ensureNumbersOverlay() {
+
+        if (numbersOverlay != null) {
+            return
+        }
+
+        val wm =
+            windowManager
+                ?: return
+
+        val overlay =
+            FrameLayout(this)
+
+        overlay.setBackgroundColor(
+            Color.TRANSPARENT
+        )
+
+        val params =
+            createOverlayParams()
+
+        try {
+
+            wm.addView(
+                overlay,
+                params
+            )
+
+            numbersOverlay =
+                overlay
+
+        } catch (e: Exception) {
+
+            Log.e(
+                TAG,
+                "No se pudo crear overlay de números",
+                e
+            )
+        }
+    }
+
+    // =========================================================
+    // DRAW NUMBERS
+    // =========================================================
+
+    private fun drawNumbers() {
+
+        val overlay =
+            numbersOverlay
+                ?: return
+
+        overlay.removeAllViews()
+
+        val density =
+            resources.displayMetrics.density
+
+        for ((number, bounds) in numberedBounds) {
+
+            val label =
+                TextView(this)
+
+            label.text =
+                number.toString()
+
+            label.setTextColor(
+                Color.WHITE
+            )
+
+            label.setTextSize(
+                android.util.TypedValue.COMPLEX_UNIT_SP,
+                14f
+            )
+
+            label.setTypeface(
+                Typeface.DEFAULT,
+                Typeface.BOLD
+            )
+
+            label.gravity =
+                Gravity.CENTER
+
+            label.setBackgroundColor(
+                Color.argb(
+                    220,
+                    0,
+                    0,
+                    0
+                )
+            )
+
+            /*
+             * Tamaño de la etiqueta.
+             */
+
+            val size =
+                (32f * density).toInt()
+
+            val params =
+                FrameLayout.LayoutParams(
+                    size,
+                    size
+                )
+
+            /*
+             * Centrar el número aproximadamente
+             * sobre el elemento.
+             */
+
+            params.leftMargin =
+                bounds.centerX() - size / 2
+
+            params.topMargin =
+                bounds.centerY() - size / 2
+
+            /*
+             * Evitar que la etiqueta se salga por
+             * los bordes de la pantalla.
+             */
+
+            val maxX =
+                resources.displayMetrics.widthPixels -
+                        size
+
+            val maxY =
+                resources.displayMetrics.heightPixels -
+                        size
+
+            params.leftMargin =
+                params.leftMargin.coerceIn(
+                    0,
+                    maxX.coerceAtLeast(0)
+                )
+
+            params.topMargin =
+                params.topMargin.coerceIn(
+                    0,
+                    maxY.coerceAtLeast(0)
+                )
+
+            overlay.addView(
+                label,
+                params
+            )
+        }
+    }
+
+    // =========================================================
+    // OVERLAY PARAMS
+    // =========================================================
+
+    private fun createOverlayParams():
+            WindowManager.LayoutParams {
+
+        return WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+
+            /*
+             * AccessibilityService puede utilizar
+             * TYPE_ACCESSIBILITY_OVERLAY.
+             *
+             * Esto evita necesitar el permiso
+             * android.permission.SYSTEM_ALERT_WINDOW.
+             */
+
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+
+            /*
+             * IMPORTANTÍSIMO:
+             *
+             * NOT_TOUCHABLE hace que la cuadrícula y los números
+             * no bloqueen los toques de la aplicación debajo.
+             */
+
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+
+            android.graphics.PixelFormat.TRANSLUCENT
+        ).apply {
+
+            gravity =
+                Gravity.TOP or Gravity.START
+        }
+    }
+
+    // =========================================================
+    // REMOVE GRID
+    // =========================================================
+
+    private fun removeGridOverlay() {
+
+        val overlay =
+            gridOverlay
+                ?: return
+
+        try {
+
+            windowManager?.removeView(
+                overlay
+            )
+
+        } catch (e: Exception) {
+
+            Log.e(
+                TAG,
+                "Error eliminando grid overlay",
+                e
+            )
+        }
+
+        gridOverlay =
+            null
+    }
+
+    // =========================================================
+    // REMOVE NUMBERS
+    // =========================================================
+
+    private fun removeNumbersOverlay() {
+
+        val overlay =
+            numbersOverlay
+                ?: return
+
+        try {
+
+            windowManager?.removeView(
+                overlay
+            )
+
+        } catch (e: Exception) {
+
+            Log.e(
+                TAG,
+                "Error eliminando numbers overlay",
+                e
+            )
+        }
+
+        numbersOverlay =
+            null
+    }
+
+    // =========================================================
+    // DP -> PX
+    // =========================================================
+
+    private fun dp(
+        value: Int
+    ): Int {
+
+        return (
+                value *
+                        resources.displayMetrics.density
+                ).toInt()
+    }
+
+    // =========================================================
+    // REFRESH TOKEN
+    // =========================================================
+
+    private val NUMBER_REFRESH_TOKEN =
+        Any()
+
+    // =========================================================
+    // SIMPLE LINE VIEW
+    // =========================================================
+
+    private class ViewLine(
+        context: Context,
+        color: Int
+    ) : android.view.View(context) {
+
+        init {
+            setBackgroundColor(color)
+        }
     }
 }

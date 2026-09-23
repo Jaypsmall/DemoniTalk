@@ -13,6 +13,15 @@ class CommandRepository(private val context: Context) {
     private val DARK_MODE_KEY = "dark_mode"
     private val EXPORT_PATH_KEY = "export_path"
     private val GEMINI_API_KEY = "gemini_api_key"
+    private val AI_ENABLED_KEY = "ai_enabled"
+
+    fun saveAiEnabled(enabled: Boolean) {
+        prefs.edit { putBoolean(AI_ENABLED_KEY, enabled) }
+    }
+
+    fun isAiEnabled(): Boolean {
+        return prefs.getBoolean(AI_ENABLED_KEY, true)
+    }
 
     fun saveGeminiApiKey(key: String) {
         prefs.edit { putString(GEMINI_API_KEY, key) }
@@ -92,7 +101,9 @@ class CommandRepository(private val context: Context) {
             VoiceCommand("reboot", "reboot", true),
             VoiceCommand("ajustes", "com.android.settings"),
             VoiceCommand("activar escucha", "internal_continuous_on"),
-            VoiceCommand("desactivar escucha", "internal_continuous_off"),
+            VoiceCommand("desactivar escucha", "internal_stop"),
+            VoiceCommand("activa c4", "internal_mode_blue"),
+            VoiceCommand("modo azul", "internal_mode_blue"),
             VoiceCommand("encender foco", "torch_on"),
             VoiceCommand("apagar foco", "torch_off"),
             VoiceCommand("primer chat", "click_first_chat"),

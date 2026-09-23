@@ -25,6 +25,9 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
 import androidx.core.app.NotificationCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 class FloatingButtonService : Service() {
@@ -37,6 +40,7 @@ class FloatingButtonService : Service() {
     private lateinit var commandHandler: CommandHandler
     private lateinit var repository: CommandRepository
     private lateinit var audioManager: AudioManager
+    private lateinit var aiAssistant: AiAssistant
 
     private var originalSystemVolume: Int = -1
 
@@ -67,6 +71,10 @@ class FloatingButtonService : Service() {
     ): Int {
 
         if (isServiceDestroyed) return START_NOT_STICKY
+
+        if (floatingView == null && android.provider.Settings.canDrawOverlays(this)) {
+            createFloatingView()
+        }
 
         when (intent?.action) {
 
@@ -170,9 +178,10 @@ class FloatingButtonService : Service() {
         }
 
         /*
-         * Comandos
+         * Comandos y Asistente IA
          */
         repository = CommandRepository(this)
+        aiAssistant = AiAssistant(this)
 
         commandHandler = CommandHandler(this)
 
@@ -188,17 +197,40 @@ class FloatingButtonService : Service() {
                         stopEverything()
                     }
 
-                    "internal_continuous_on" -> {
+                    "internal_continuous_on", "internal_mode_green" -> {
 
-                        if (!isContinuousMode) {
+                        stopPendingRestart()
 
-                            isContinuousMode = true
-                            isVigilanceMode = false
-                            isWaitingForCommandAfterWake = false
+                        isContinuousMode = true
+                        isVigilanceMode = false
+                        isWaitingForCommandAfterWake = false
 
-                            updateButtonUI()
-                            startListening()
-                        }
+                        updateButtonUI()
+                        startListening()
+                    }
+
+                    "internal_mode_blue", "internal_vigilance_on" -> {
+
+                        stopPendingRestart()
+
+                        isContinuousMode = false
+                        isVigilanceMode = true
+                        isWaitingForCommandAfterWake = false
+
+                        updateButtonUI()
+                        startListening()
+                    }
+
+                    "internal_mode_yellow" -> {
+
+                        stopPendingRestart()
+
+                        isContinuousMode = false
+                        isVigilanceMode = false
+                        isWaitingForCommandAfterWake = true
+
+                        updateButtonUI()
+                        startListening()
                     }
                 }
             }
@@ -247,8 +279,8 @@ class FloatingButtonService : Service() {
         )
 
         params.gravity = Gravity.TOP or Gravity.START
-        params.x = 460
-        params.y = 948
+        params.x = 100
+        params.y = 300
 
         try {
 
@@ -957,6 +989,18 @@ class FloatingButtonService : Service() {
                             handleWakeWordResponse()
 
                             return
+                        } else if (
+                            result == CommandHandler.CommandResult.Ignored
+                        ) {
+
+                            Log.d(
+                                "DemoniTalk",
+                                "Comando no local. Procesando con Inteligencia Artificial Gemini..."
+                            )
+
+                            processWithAiAndSpeak(text)
+
+                            return
                         }
 
                     } catch (e: Exception) {
@@ -1262,6 +1306,80 @@ class FloatingButtonService : Service() {
             )
 
             startListening()
+        }
+    }
+
+    private fun speakText(textToSpeak: String, onDoneCallback: (() -> Unit)? = null) {
+        if (!isTtsReady) {
+            onDoneCallback?.invoke()
+            return
+        }
+
+        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(id: String?) {
+                isListening = false
+            }
+
+            override fun onDone(id: String?) {
+                mainHandler.post {
+                    onDoneCallback?.invoke()
+                }
+            }
+
+            @Deprecated("Deprecated in Java")
+            override fun onError(id: String?) {
+                mainHandler.post {
+                    onDoneCallback?.invoke()
+                }
+            }
+        })
+
+        try {
+            tts.speak(
+                textToSpeak,
+                TextToSpeech.QUEUE_FLUSH,
+                null,
+                "DemoniSpeech_${System.currentTimeMillis()}"
+            )
+        } catch (e: Exception) {
+            Log.e("DemoniTalk", "Error ejecutando TTS: ${e.message}")
+            onDoneCallback?.invoke()
+        }
+    }
+
+    private fun processWithAiAndSpeak(prompt: String) {
+        if (isServiceDestroyed) return
+
+        if (!aiAssistant.hasApiKey()) {
+            isWaitingForCommandAfterWake = false
+            if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) {
+                scheduleListeningRestart(500)
+            } else {
+                updateButtonUI()
+            }
+            return
+        }
+
+        CoroutineScope(Dispatchers.Main).launch {
+            val aiReply = aiAssistant.askGemini(prompt)
+            if (!aiReply.isNullOrEmpty()) {
+                speakText(aiReply) {
+                    isWaitingForCommandAfterWake = false
+                    if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) {
+                        startListening()
+                    } else {
+                        updateButtonUI()
+                    }
+                }
+            } else {
+                Log.w("DemoniTalk", "Sin respuesta de Gemini o fallo de conexión. Silencio.")
+                isWaitingForCommandAfterWake = false
+                if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) {
+                    scheduleListeningRestart(500)
+                } else {
+                    updateButtonUI()
+                }
+            }
         }
     }
 

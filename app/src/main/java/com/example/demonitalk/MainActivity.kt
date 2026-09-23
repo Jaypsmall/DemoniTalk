@@ -327,30 +327,85 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun AiConfigDialog(onDismiss: () -> Unit, isEnglish: Boolean) {
         var key by remember { mutableStateOf(repository.getGeminiApiKey()) }
+        var aiEnabled by remember { mutableStateOf(repository.isAiEnabled()) }
+        var testing by remember { mutableStateOf(false) }
+        var testResult by remember { mutableStateOf<String?>(null) }
+        val scope = rememberCoroutineScope()
+
         AlertDialog(
             onDismissRequest = onDismiss,
             containerColor = com.example.demonitalk.ui.theme.Obsidian,
             title = { Text("CONFIGURACIÓN DE IA", color = com.example.demonitalk.ui.theme.DemoniPurple, fontWeight = FontWeight.Black) },
             text = {
                 Column {
-                    Text("Pega aquí tu API Key de Gemini para activar el cerebro de la app.", color = com.example.demonitalk.ui.theme.SoulWhite, fontSize = 12.sp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Respuestas con IA",
+                            color = com.example.demonitalk.ui.theme.SoulWhite,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                        androidx.compose.material3.Switch(
+                            checked = aiEnabled,
+                            onCheckedChange = { 
+                                aiEnabled = it
+                                repository.saveAiEnabled(it)
+                                Toast.makeText(this@MainActivity, if (it) "IA Activada 😈" else "IA Desactivada 🔇", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+                    Text("Clave API Gemini (Opcional, si no se especifica usa el motor gratuito):", color = com.example.demonitalk.ui.theme.SoulWhite, fontSize = 12.sp)
                     Spacer(Modifier.height(8.dp))
                     TextField(
                         value = key, 
-                        onValueChange = { key = it }, 
+                        onValueChange = { key = it; testResult = null }, 
                         label = { Text("API Key") },
-                        placeholder = { Text("AIzaSy...") }
+                        placeholder = { Text("Pega tu clave API aquí...") }
                     )
+                    if (testResult != null) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = testResult!!, 
+                            fontSize = 11.sp, 
+                            color = if (testResult!!.startsWith("¡Conectado")) Color.Green else com.example.demonitalk.ui.theme.HellRed
+                        )
+                    }
                 }
             },
             confirmButton = { 
-                TextButton(onClick = { 
-                    repository.saveGeminiApiKey(key)
-                    onDismiss()
-                    Toast.makeText(this, "¡Cerebro vinculado! 😈", Toast.LENGTH_SHORT).show()
-                }) { Text("VINCULAR", color = com.example.demonitalk.ui.theme.DemoniPurple, fontWeight = FontWeight.Bold) } 
+                TextButton(
+                    enabled = !testing,
+                    onClick = { 
+                        repository.saveAiEnabled(aiEnabled)
+                        if (key.trim().isNotEmpty()) {
+                            testing = true
+                            val cleanKey = key.trim()
+                            repository.saveGeminiApiKey(cleanKey)
+                            val assistant = AiAssistant(this@MainActivity)
+                            scope.launch {
+                                val reply = assistant.askGemini("Di Hola")
+                                testing = false
+                                testResult = if (!reply.isNullOrEmpty()) {
+                                    "¡Conectado con éxito! 😈 Respuesta: $reply"
+                                } else {
+                                    "Error de conexión con Gemini."
+                                }
+                            }
+                        } else {
+                            onDismiss()
+                        }
+                    }
+                ) { 
+                    Text(if (testing) "PROBANDO..." else if (key.trim().isNotEmpty()) "PROBAR Y GUARDAR" else "GUARDAR", color = com.example.demonitalk.ui.theme.DemoniPurple, fontWeight = FontWeight.Bold) 
+                } 
             },
-            dismissButton = { TextButton(onClick = onDismiss) { Text("CANCELAR", color = AshGrey) } }
+            dismissButton = { TextButton(onClick = onDismiss) { Text("CERRAR", color = AshGrey) } }
         )
     }
 
