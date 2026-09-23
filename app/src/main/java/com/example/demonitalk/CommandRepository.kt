@@ -12,6 +12,15 @@ class CommandRepository(private val context: Context) {
     private val COMMANDS_KEY = "commands"
     private val DARK_MODE_KEY = "dark_mode"
     private val EXPORT_PATH_KEY = "export_path"
+    private val GEMINI_API_KEY = "gemini_api_key"
+
+    fun saveGeminiApiKey(key: String) {
+        prefs.edit { putString(GEMINI_API_KEY, key) }
+    }
+
+    fun getGeminiApiKey(): String {
+        return prefs.getString(GEMINI_API_KEY, "") ?: ""
+    }
 
     fun saveDarkMode(enabled: Boolean) {
         prefs.edit { putBoolean(DARK_MODE_KEY, enabled) }

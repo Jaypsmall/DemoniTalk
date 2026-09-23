@@ -118,10 +118,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private val requestPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+    private val requestPermissionLauncher by lazy {
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
         if (!isGranted) {
             Toast.makeText(this, "Permission denied for recording audio", Toast.LENGTH_SHORT).show()
         }
+    }
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -133,6 +135,7 @@ class MainActivity : ComponentActivity() {
         var showSuccessDialog by remember { mutableStateOf(false) }
         var showSettingsDialog by remember { mutableStateOf(false) }
         var showStorageDialog by remember { mutableStateOf(false) }
+        var showAiDialog by remember { mutableStateOf(false) }
         var isEnglish by remember { mutableStateOf(false) }
         
         val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -220,10 +223,15 @@ class MainActivity : ComponentActivity() {
                         DrawerButton(text = if (isEnglish) "Export" else "Exportar", icon = Icons.Default.Download) { exportLauncher.launch("DemoniTalk_Backup.json"); scope.launch { drawerState.close() } }
                         Spacer(modifier = Modifier.height(16.dp))
                         DrawerButton(text = if (isEnglish) "Storage" else "Almacenamiento", icon = Icons.Default.Menu) { showStorageDialog = true; scope.launch { drawerState.close() } }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        DrawerButton(text = if (isEnglish) "AI Config" else "Cerebro IA", icon = Icons.Default.Add, iconTint = com.example.demonitalk.ui.theme.DemoniPurple) { 
+                            showAiDialog = true
+                            scope.launch { drawerState.close() } 
+                        }
                         
                         Spacer(modifier = Modifier.weight(1f))
                         Column(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(text = "DemoniTalk v1.0.3", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (isDarkMode) AshGrey else Color.DarkGray)
+                            Text(text = "DemoniTalk v2.0.0", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (isDarkMode) AshGrey else Color.DarkGray)
                             Text(text = "Created by JAYLIZ with ❤️", fontSize = 9.sp, color = (if (isDarkMode) AshGrey else Color.DarkGray).copy(0.7f))
                         }
                     }
@@ -311,8 +319,39 @@ class MainActivity : ComponentActivity() {
                 if (showSuccessDialog) SuccessDialog(onDismiss = { showSuccessDialog = false }, isEnglish = isEnglish)
                 if (showSettingsDialog) SettingsDialog(onDismiss = { showSettingsDialog = false }, isEnglish = isEnglish)
                 if (showStorageDialog) StorageDialog(onDismiss = { showStorageDialog = false }, isEnglish = isEnglish, onCommandsUpdated = { commands = it })
+                if (showAiDialog) AiConfigDialog(onDismiss = { showAiDialog = false }, isEnglish = isEnglish)
             }
         }
+    }
+
+    @Composable
+    fun AiConfigDialog(onDismiss: () -> Unit, isEnglish: Boolean) {
+        var key by remember { mutableStateOf(repository.getGeminiApiKey()) }
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            containerColor = com.example.demonitalk.ui.theme.Obsidian,
+            title = { Text("CONFIGURACIÓN DE IA", color = com.example.demonitalk.ui.theme.DemoniPurple, fontWeight = FontWeight.Black) },
+            text = {
+                Column {
+                    Text("Pega aquí tu API Key de Gemini para activar el cerebro de la app.", color = com.example.demonitalk.ui.theme.SoulWhite, fontSize = 12.sp)
+                    Spacer(Modifier.height(8.dp))
+                    TextField(
+                        value = key, 
+                        onValueChange = { key = it }, 
+                        label = { Text("API Key") },
+                        placeholder = { Text("AIzaSy...") }
+                    )
+                }
+            },
+            confirmButton = { 
+                TextButton(onClick = { 
+                    repository.saveGeminiApiKey(key)
+                    onDismiss()
+                    Toast.makeText(this, "¡Cerebro vinculado! 😈", Toast.LENGTH_SHORT).show()
+                }) { Text("VINCULAR", color = com.example.demonitalk.ui.theme.DemoniPurple, fontWeight = FontWeight.Bold) } 
+            },
+            dismissButton = { TextButton(onClick = onDismiss) { Text("CANCELAR", color = AshGrey) } }
+        )
     }
 
     @Composable
@@ -402,10 +441,10 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun DrawerButton(text: String, icon: ImageVector, onClick: () -> Unit) {
+    fun DrawerButton(text: String, icon: ImageVector, iconTint: Color = MaterialTheme.colorScheme.primary, onClick: () -> Unit) {
         Surface(onClick = onClick, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(12.dp), color = Color.Transparent) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 16.dp)) {
-                Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
+                Icon(icon, null, tint = iconTint)
                 Spacer(Modifier.width(16.dp))
                 Text(text, fontWeight = FontWeight.Medium)
             }

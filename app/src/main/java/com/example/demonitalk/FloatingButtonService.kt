@@ -1230,6 +1230,7 @@ class FloatingButtonService : Service() {
                     }
                 }
 
+                @Deprecated("Deprecated in Java")
                 override fun onError(
                     id: String?
                 ) {
