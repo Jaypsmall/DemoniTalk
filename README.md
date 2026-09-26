@@ -6,6 +6,8 @@
 
 **DemoniTalk (v2.0.1) in releases**
 
+* **https://github.com/Jaypsmall/DemoniTalk/releases/download/root/DemoniTalk_v2.0.1.apk**
+
 ---
 
 <p align="center">
