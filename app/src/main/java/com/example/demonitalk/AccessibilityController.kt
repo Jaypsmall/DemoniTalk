@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.util.Log
 import java.util.Locale
+import androidx.core.net.toUri
 
 class AccessibilityController(
     private val context: Context
@@ -276,11 +277,12 @@ class AccessibilityController(
             Log.e(TAG, "Error iniciando búsqueda web", e)
             // Fallback a navegador normal si ACTION_WEB_SEARCH no está disponible
             try {
-                val browserIntent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://www.google.com/search?q=$query"))
+                val browserIntent = Intent(Intent.ACTION_VIEW,
+                    "https://www.google.com/search?q=$query".toUri())
                 browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(browserIntent)
                 true
-            } catch (e2: Exception) {
+            } catch (_: Exception) {
                 false
             }
         }

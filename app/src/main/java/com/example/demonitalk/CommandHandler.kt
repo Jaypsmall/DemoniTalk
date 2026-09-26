@@ -352,12 +352,24 @@ class CommandHandler(context: Context) {
         }
 
         // ---------------------------------------------------------
-        // CLIC POR NÚMERO
+        // CLIC POR NÚMERO (ej. "toca el 5", "presiona 5", "cinco")
         // ---------------------------------------------------------
+        val normalizedNumbersText = normalizedText
+            .replace(Regex("""\buno\b"""), "1")
+            .replace(Regex("""\bdos\b"""), "2")
+            .replace(Regex("""\btres\b"""), "3")
+            .replace(Regex("""\bcuatro\b"""), "4")
+            .replace(Regex("""\bcinco\b"""), "5")
+            .replace(Regex("""\bseis\b"""), "6")
+            .replace(Regex("""\bsiete\b"""), "7")
+            .replace(Regex("""\bocho\b"""), "8")
+            .replace(Regex("""\bnueve\b"""), "9")
+            .replace(Regex("""\bdiez\b"""), "10")
+
         val numberPattern = Pattern.compile(
-            """(?:pulsa|clic|click|numero|el)\s+(\d+)"""
+            """(?:pulsa|pulsar|clic|click|numero|el|toca|tocar|presiona|presionar|selecciona|seleccionar|opcion)\s+(?:el\s+)?(\d+)"""
         )
-        val matcher = numberPattern.matcher(normalizedText)
+        val matcher = numberPattern.matcher(normalizedNumbersText)
 
         if (matcher.find()) {
             val num = matcher.group(1)
@@ -368,11 +380,21 @@ class CommandHandler(context: Context) {
             }
         }
 
+        if (normalizedNumbersText.matches(Regex("""^\d+$"""))) {
+            Log.d("CommandHandler", "Número aislado detectado: $normalizedNumbersText")
+            executeAsync("click_number:$normalizedNumbersText")
+            return true
+        }
+
         // ---------------------------------------------------------
-        // CLICK POR TEXTO
+        // CLICK POR TEXTO (ej. "pulsa enviar", "toca enviar")
         // ---------------------------------------------------------
-        if (normalizedText.startsWith("pulsa ")) {
-            val targetText = normalizedText.removePrefix("pulsa ").trim()
+        if (normalizedText.startsWith("pulsa ") || normalizedText.startsWith("toca ") || normalizedText.startsWith("presiona ")) {
+            val targetText = normalizedText
+                .replaceFirst("pulsa ", "")
+                .replaceFirst("toca ", "")
+                .replaceFirst("presiona ", "")
+                .trim()
             if (targetText.isNotEmpty()) {
                 executeAsync("click_text:$targetText")
                 return true
