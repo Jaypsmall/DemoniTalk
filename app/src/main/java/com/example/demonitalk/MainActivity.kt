@@ -3,6 +3,7 @@ package com.example.demonitalk
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
@@ -13,13 +14,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -30,7 +24,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -42,7 +35,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
@@ -95,7 +87,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import com.example.demonitalk.ui.theme.AshGrey
@@ -110,8 +101,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         repository = CommandRepository(this)
-
-        checkPermissions()
+        
+        // Solo verificamos el permiso de grabación al inicio
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
 
         setContent {
             var isDark by remember { mutableStateOf(repository.isDarkMode()) }
@@ -124,22 +118,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun checkPermissions() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-        }
-
-        if (!Settings.canDrawOverlays(this)) {
-            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                "package:$packageName".toUri())
-            startActivity(intent)
-        }
-    }
-
-    private val requestPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+    private val requestPermissionLauncher by lazy {
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
         if (!isGranted) {
             Toast.makeText(this, "Permission denied for recording audio", Toast.LENGTH_SHORT).show()
         }
+    }
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -151,6 +135,7 @@ class MainActivity : ComponentActivity() {
         var showSuccessDialog by remember { mutableStateOf(false) }
         var showSettingsDialog by remember { mutableStateOf(false) }
         var showStorageDialog by remember { mutableStateOf(false) }
+        var showAiDialog by remember { mutableStateOf(false) }
         var isEnglish by remember { mutableStateOf(false) }
         
         val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -194,31 +179,25 @@ class MainActivity : ComponentActivity() {
 
         val titleShadow = Shadow(
             color = Color.Black.copy(alpha = 0.8f),
-            offset = Offset(6f, 6f),
-            blurRadius = 12f
+            offset = Offset(4f, 4f),
+            blurRadius = 8f
         )
         val demoniTitle = buildAnnotatedString {
             withStyle(style = SpanStyle(
-                color = MaterialTheme.colorScheme.primary,
+                color = com.example.demonitalk.ui.theme.HellRed,
                 fontWeight = FontWeight.ExtraBold,
                 shadow = titleShadow
-            )) {
-                append("De")
-            }
+            )) { append("De") }
             withStyle(style = SpanStyle(
-                color = MaterialTheme.colorScheme.tertiary,
+                color = com.example.demonitalk.ui.theme.BrimstoneYellow,
                 fontWeight = FontWeight.ExtraBold,
                 shadow = titleShadow
-            )) {
-                append("moni")
-            }
+            )) { append("moni") }
             withStyle(style = SpanStyle(
-                color = MaterialTheme.colorScheme.onSurface,
+                color = if (isDarkMode) com.example.demonitalk.ui.theme.SoulWhite else com.example.demonitalk.ui.theme.AbyssBlack,
                 fontWeight = FontWeight.ExtraBold,
                 shadow = titleShadow
-            )) {
-                append("Talk 😈")
-            }
+            )) { append("Talk 😈") }
         }
 
         ModalNavigationDrawer(
@@ -229,68 +208,31 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.width(300.dp)
                 ) {
                     Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(24.dp),
+                        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(
-                            text = demoniTitle,
-                            style = MaterialTheme.typography.headlineMedium,
-                            modifier = Modifier.padding(vertical = 32.dp)
-                        )
+                        Text(text = demoniTitle, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(vertical = 32.dp))
+                        HorizontalDivider(modifier = Modifier.padding(bottom = 32.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
                         
-                        HorizontalDivider(
-                            modifier = Modifier.padding(bottom = 32.dp),
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                        )
-                        
-                        DrawerButton(text = if (isEnglish) "Settings" else "Ajustes", icon = Icons.Default.Menu) { 
-                            showSettingsDialog = true
-                            scope.launch { drawerState.close() }
-                        }
+                        DrawerButton(text = if (isEnglish) "Settings" else "Ajustes", icon = Icons.Default.Menu) { showSettingsDialog = true; scope.launch { drawerState.close() } }
                         Spacer(modifier = Modifier.height(16.dp))
-                        DrawerButton(text = if (isEnglish) "Languages" else "Idiomas", icon = Icons.Default.Menu) { 
-                            isEnglish = !isEnglish
-                        }
+                        DrawerButton(text = if (isEnglish) "Languages" else "Idiomas", icon = Icons.Default.Menu) { isEnglish = !isEnglish }
                         Spacer(modifier = Modifier.height(16.dp))
-                        DrawerButton(text = if (isEnglish) "Import" else "Importar", icon = Icons.Default.Upload) {
-                            importLauncher.launch("*/*")
-                            scope.launch { drawerState.close() }
-                        }
+                        DrawerButton(text = if (isEnglish) "Import" else "Importar", icon = Icons.Default.Upload) { importLauncher.launch("*/*"); scope.launch { drawerState.close() } }
                         Spacer(modifier = Modifier.height(16.dp))
-                        DrawerButton(text = if (isEnglish) "Export" else "Exportar", icon = Icons.Default.Download) { 
-                            exportLauncher.launch("DemoniTalk_Backup.json")
-                            scope.launch { drawerState.close() }
-                        }
+                        DrawerButton(text = if (isEnglish) "Export" else "Exportar", icon = Icons.Default.Download) { exportLauncher.launch("DemoniTalk_Backup.json"); scope.launch { drawerState.close() } }
                         Spacer(modifier = Modifier.height(16.dp))
-                        DrawerButton(text = if (isEnglish) "Storage" else "Almacenamiento", icon = Icons.Default.Menu) { 
-                            showStorageDialog = true
-                            scope.launch { drawerState.close() }
-                        }
+                        DrawerButton(text = if (isEnglish) "Storage" else "Almacenamiento", icon = Icons.Default.Menu) { showStorageDialog = true; scope.launch { drawerState.close() } }
                         Spacer(modifier = Modifier.height(16.dp))
-                        DrawerButton(text = if (isEnglish) "Help" else "Ayuda", icon = Icons.Default.Menu) { /* TODO */ }
+                        DrawerButton(text = if (isEnglish) "AI Config" else "Cerebro IA", icon = Icons.Default.Add, iconTint = com.example.demonitalk.ui.theme.DemoniPurple) { 
+                            showAiDialog = true
+                            scope.launch { drawerState.close() } 
+                        }
                         
                         Spacer(modifier = Modifier.weight(1f))
-                        
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(16.dp), 
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "DemoniTalk v1.0.3",
-                                fontSize = 12.sp, 
-                                fontWeight = FontWeight.Bold, 
-                                color = if (isDarkMode) AshGrey else Color.DarkGray
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Created by JAYLIZ with ❤️", 
-                                fontSize = 9.sp, 
-                                color = (if (isDarkMode) AshGrey else Color.DarkGray).copy(0.7f),
-                                fontWeight = FontWeight.Medium
-                            )
+                        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(text = "DemoniTalk v2.0.1", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (isDarkMode) AshGrey else Color.DarkGray)
+                            Text(text = "Created by JAYLIZ with ❤️", fontSize = 9.sp, color = (if (isDarkMode) AshGrey else Color.DarkGray).copy(0.7f))
                         }
                     }
                 }
@@ -300,548 +242,321 @@ class MainActivity : ComponentActivity() {
                 topBar = {
                     Column {
                         TopAppBar(
-                            colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = MaterialTheme.colorScheme.background,
-                                navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
-                                titleContentColor = MaterialTheme.colorScheme.onSurface,
-                                actionIconContentColor = MaterialTheme.colorScheme.onSurface
-                            ),
-                            navigationIcon = {
-                                IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                                    Icon(Icons.Default.Menu, contentDescription = "Menu")
-                                }
-                            },
-                            title = {
-                                Text(
-                                    text = demoniTitle,
-                                    style = MaterialTheme.typography.headlineMedium
-                                )
-                            },
+                            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                            navigationIcon = { IconButton(onClick = { scope.launch { drawerState.open() } }) { Icon(Icons.Default.Menu, "Menu") } },
+                            title = { Text(text = demoniTitle, style = MaterialTheme.typography.headlineMedium) },
                             actions = {
                                 IconButton(onClick = { onThemeToggle(!isDarkMode) }) {
                                     Crossfade(targetState = isDarkMode, animationSpec = tween(500)) { dark ->
-                                        Icon(
-                                            if (dark) Icons.Default.DarkMode else Icons.Default.NightsStay,
-                                            contentDescription = "Toggle Dark Mode"
-                                        )
+                                        Icon(if (dark) Icons.Default.DarkMode else Icons.Default.NightsStay, "Theme")
                                     }
                                 }
                             }
                         )
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(3.dp)
-                                .background(
-                                    brush = Brush.horizontalGradient(
-                                        colors = listOf(
-                                            Color.Transparent,
-                                            Color(0xFFC0C0C0),
-                                            Color.White,
-                                            Color(0xFFC0C0C0),
-                                            Color.Transparent
-                                        )
-                                    )
-                                )
-                        )
+                        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(Brush.horizontalGradient(listOf(Color.Transparent, Color(0xFFFF0600), Color(0xFFFFD600), Color(0xFFFF0600), Color.Transparent))))
                     }
                 },
                 floatingActionButton = {
                     FloatingActionButton(
                         onClick = { showDialog = true },
-                        containerColor = MaterialTheme.colorScheme.primary,
+                        containerColor = com.example.demonitalk.ui.theme.HellRed,
+                        contentColor = Color.White,
                         modifier = Modifier
-                            .shadow(elevation = 12.dp, shape = FloatingActionButtonDefaults.shape, ambientColor = Color.Black, spotColor = Color.Black)
-                            .border(1.dp, Color.White.copy(alpha = 0.3f), FloatingActionButtonDefaults.shape)
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = "Add Command")
-                    }
+                            .shadow(16.dp, FloatingActionButtonDefaults.shape, spotColor = com.example.demonitalk.ui.theme.HellRed)
+                            .border(1.dp, Color.White.copy(0.4f), FloatingActionButtonDefaults.shape)
+                    ) { Icon(Icons.Default.Add, "Add", modifier = Modifier.size(28.dp)) }
                 },
                 floatingActionButtonPosition = FabPosition.End
             ) { padding ->
-                Column(
-                    modifier = Modifier
-                        .padding(padding)
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background) // Negro en oscuro, Plata brillante en claro
-                ) {
-                    DemoniButton(
-                        text = if (isEnglish) "Start Floating Button" else "Iniciar Botón Flotante",
-                        onClick = { startFloatingService() }
-                    )
-
-                    DemoniButton(
-                        text = if (isEnglish) "Request Root Access" else "Solicitar Acceso Root",
-                        containerColor = MaterialTheme.colorScheme.error,
-                        onClick = { requestRoot() }
-                    )
-
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 80.dp)
-                    ) {
-                        items(commands, key = { it.trigger + it.action }) { command ->
-                            CommandItem(
-                                command,
-                                onDelete = {
-                                    commands = commands - command
-                                    repository.saveCommands(commands)
-                                },
-                                onEdit = {
-                                    editingCommand = command
-                                }
+                Column(modifier = Modifier.padding(padding).fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp)) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            DemoniButton(
+                                text = if (isEnglish) "(Accessibility)" else "(Accesibilidad)",
+                                containerColor = com.example.demonitalk.ui.theme.DemoniPurple,
+                                onClick = { checkAndOpenAccessibility() }
                             )
                         }
                     }
-                }
+                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp)) {
+                        Box(modifier = Modifier.weight(1f)) { DemoniButton(text = if (isEnglish) "Start Floating" else "Iniciar Botón", onClick = { startFloatingService() }) }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(modifier = Modifier.weight(1f)) { DemoniButton(text = if (isEnglish) "Request Root" else "Solicitar Root", containerColor = MaterialTheme.colorScheme.error, onClick = { requestRoot() }) }
+                    }
 
-                // Animación fluida para los diálogos
-                AnimatedVisibility(
-                    visible = showDialog,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
-                ) {
-                    AddCommandDialog(
-                        onDismiss = { showDialog = false },
-                        onAdd = { trigger, action, isRoot ->
-                            val newCommand = VoiceCommand(trigger, action, isRoot)
-                            commands = commands + newCommand
-                            repository.saveCommands(commands)
-                            showDialog = false
-                        }
-                    )
-                }
-
-                AnimatedVisibility(
-                    visible = editingCommand != null,
-                    enter = fadeIn() + scaleIn(),
-                    exit = fadeOut() + scaleOut()
-                ) {
-                    if (editingCommand != null) {
-                        AddCommandDialog(
-                            commandToEdit = editingCommand,
-                            onDismiss = { editingCommand = null },
-                            onAdd = { trigger, action, isRoot ->
-                                val newCommands = commands.toMutableList()
-                                val index = newCommands.indexOf(editingCommand)
-                                if (index != -1) {
-                                    newCommands[index] = VoiceCommand(trigger, action, isRoot)
-                                    commands = newCommands
-                                    repository.saveCommands(commands)
-                                }
-                                editingCommand = null
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp).border(1.dp, Color.White.copy(0.05f), RoundedCornerShape(16.dp)),
+                        colors = CardDefaults.cardColors(containerColor = if (isDarkMode) com.example.demonitalk.ui.theme.Obsidian else Color.White.copy(0.9f)),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = CardDefaults.cardElevation(4.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(text = if (isEnglish) "QUICK ACTIONS" else "ACCIONES RÁPIDAS", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.sp, modifier = Modifier.padding(bottom = 8.dp, start = 4.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                ControlCircleButton(Color(0xFFFFD600)) { sendControlIntent("ACTION_MODE_YELLOW") }
+                                Spacer(modifier = Modifier.width(16.dp))
+                                ControlCircleButton(Color(0xFF2196F3)) { sendControlIntent("ACTION_MODE_BLUE") }
+                                Spacer(modifier = Modifier.width(16.dp))
+                                ControlCircleButton(Color(0xFF4CAF50)) { sendControlIntent("ACTION_MODE_GREEN") }
+                                Spacer(modifier = Modifier.weight(1f))
+                                ControlCircleButton(Color(0xFFFF0600)) { sendControlIntent("ACTION_MODE_RED") }
                             }
-                        )
+                        }
+                    }
+
+                    Text(text = if (isEnglish) "VOICE COMMANDS" else "COMANDOS DE VOZ", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = if (isDarkMode) AshGrey else Color.Gray, letterSpacing = 1.5.sp, modifier = Modifier.padding(start = 18.dp, top = 12.dp, bottom = 6.dp))
+
+                    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 88.dp, top = 4.dp)) {
+                        items(commands, key = { it.trigger + it.action }) { command ->
+                            CommandItem(command, isDarkMode = isDarkMode, onDelete = { commands = commands - command; repository.saveCommands(commands) }, onEdit = { editingCommand = command })
+                        }
                     }
                 }
 
-                // Diálogo de Éxito al Exportar
-                if (showSuccessDialog) {
-                    SuccessDialog(onDismiss = { showSuccessDialog = false }, isEnglish = isEnglish)
-                }
-
-                if (showSettingsDialog) {
-                    SettingsDialog(onDismiss = { showSettingsDialog = false }, isEnglish = isEnglish)
-                }
-
-                if (showStorageDialog) {
-                    StorageDialog(
-                        onDismiss = { showStorageDialog = false },
-                        isEnglish = isEnglish,
-                        onCommandsUpdated = { commands = it }
-                    )
-                }
+                if (showDialog) { AddCommandDialog(onDismiss = { showDialog = false }, onAdd = { t, a, r -> val nc = VoiceCommand(t, a, r); commands = commands + nc; repository.saveCommands(commands); showDialog = false }) }
+                editingCommand?.let { ec -> AddCommandDialog(commandToEdit = ec, onDismiss = { editingCommand = null }, onAdd = { t, a, r -> val nc = commands.toMutableList(); val i = nc.indexOf(ec); if (i != -1) { nc[i] = VoiceCommand(t, a, r); commands = nc; repository.saveCommands(commands) }; editingCommand = null }) }
+                if (showSuccessDialog) SuccessDialog(onDismiss = { showSuccessDialog = false }, isEnglish = isEnglish)
+                if (showSettingsDialog) SettingsDialog(onDismiss = { showSettingsDialog = false }, isEnglish = isEnglish)
+                if (showStorageDialog) StorageDialog(onDismiss = { showStorageDialog = false }, isEnglish = isEnglish, onCommandsUpdated = { commands = it })
+                if (showAiDialog) AiConfigDialog(onDismiss = { showAiDialog = false }, isEnglish = isEnglish)
             }
         }
     }
 
     @Composable
-    fun StorageDialog(onDismiss: () -> Unit, isEnglish: Boolean, onCommandsUpdated: (List<VoiceCommand>) -> Unit) {
-        var files by remember { mutableStateOf(repository.getBackupFiles()) }
-        val currentCommandsCount = repository.loadCommands().size
+    fun AiConfigDialog(onDismiss: () -> Unit, isEnglish: Boolean) {
+        var key by remember { mutableStateOf(repository.getGeminiApiKey()) }
+        var aiEnabled by remember { mutableStateOf(repository.isAiEnabled()) }
+        var testing by remember { mutableStateOf(false) }
+        var testResult by remember { mutableStateOf<String?>(null) }
+        val scope = rememberCoroutineScope()
 
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text(if (isEnglish) "Storage Management 📦" else "Gestión de Datos 📦", style = MaterialTheme.typography.titleLarge) },
+            containerColor = com.example.demonitalk.ui.theme.Obsidian,
+            title = { Text("CONFIGURACIÓN DE IA", color = com.example.demonitalk.ui.theme.DemoniPurple, fontWeight = FontWeight.Black) },
             text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(if (isEnglish) "Internal Cache" else "Caché Interna", fontWeight = FontWeight.Bold)
+                Column {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = if (isEnglish) "Saved commands: $currentCommandsCount" else "Comandos guardados: $currentCommandsCount",
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodyMedium
+                            text = "Respuestas con IA",
+                            color = com.example.demonitalk.ui.theme.SoulWhite,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            modifier = Modifier.weight(1f)
                         )
-                        IconButton(onClick = { 
-                            repository.clearCache()
-                            onCommandsUpdated(repository.loadCommands())
-                            onDismiss()
-                            Toast.makeText(this@MainActivity, if (isEnglish) "Cache cleared!" else "¡Caché limpiada!", Toast.LENGTH_SHORT).show()
-                        }) {
-                            Icon(Icons.Default.DeleteForever, "Clear Cache", tint = Color.Red)
-                        }
-                    }
-                    
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
-                    
-                    Text(if (isEnglish) "Backups (.json)" else "Respaldos en Carpeta (.json)", fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    if (files.isEmpty()) {
-                        Text(
-                            text = if (isEnglish) "No backups found." else "No se encontraron respaldos.",
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(vertical = 8.dp)
-                        )
-                    } else {
-                        LazyColumn(modifier = Modifier.heightIn(max = 250.dp)) {
-                            items(files) { file ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(Icons.Default.Download, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = file.name, 
-                                        fontSize = 10.sp, 
-                                        modifier = Modifier.weight(1f),
-                                        maxLines = 1,
-                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                                    )
-                                    IconButton(
-                                        onClick = { 
-                                            file.delete()
-                                            files = repository.getBackupFiles()
-                                        },
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(Icons.Default.Delete, "Delete File", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
-                                    }
-                                }
+                        androidx.compose.material3.Switch(
+                            checked = aiEnabled,
+                            onCheckedChange = { 
+                                aiEnabled = it
+                                repository.saveAiEnabled(it)
+                                Toast.makeText(this@MainActivity, if (it) "IA Activada 😈" else "IA Desactivada 🔇", Toast.LENGTH_SHORT).show()
                             }
-                        }
+                        )
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+                    Text("Clave API Gemini (Opcional, si no se especifica usa el motor gratuito):", color = com.example.demonitalk.ui.theme.SoulWhite, fontSize = 12.sp)
+                    Spacer(Modifier.height(8.dp))
+                    TextField(
+                        value = key, 
+                        onValueChange = { key = it; testResult = null }, 
+                        label = { Text("API Key") },
+                        placeholder = { Text("Pega tu clave API aquí...") }
+                    )
+                    if (testResult != null) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = testResult!!, 
+                            fontSize = 11.sp, 
+                            color = if (testResult!!.startsWith("¡Conectado")) Color.Green else com.example.demonitalk.ui.theme.HellRed
+                        )
                     }
                 }
             },
-            confirmButton = {
-                TextButton(onClick = onDismiss) {
-                    Text(if (isEnglish) "CLOSE" else "CERRAR")
+            confirmButton = { 
+                TextButton(
+                    enabled = !testing,
+                    onClick = { 
+                        repository.saveAiEnabled(aiEnabled)
+                        if (key.trim().isNotEmpty()) {
+                            testing = true
+                            val cleanKey = key.trim()
+                            repository.saveGeminiApiKey(cleanKey)
+                            val assistant = AiAssistant(this@MainActivity)
+                            scope.launch {
+                                val reply = assistant.askGemini("Di Hola")
+                                testing = false
+                                testResult = if (!reply.isNullOrEmpty()) {
+                                    "¡Conectado con éxito! 😈 Respuesta: $reply"
+                                } else {
+                                    "Error de conexión con Gemini."
+                                }
+                            }
+                        } else {
+                            onDismiss()
+                        }
+                    }
+                ) { 
+                    Text(if (testing) "PROBANDO..." else if (key.trim().isNotEmpty()) "PROBAR Y GUARDAR" else "GUARDAR", color = com.example.demonitalk.ui.theme.DemoniPurple, fontWeight = FontWeight.Bold) 
+                } 
+            },
+            dismissButton = { TextButton(onClick = onDismiss) { Text("CERRAR", color = AshGrey) } }
+        )
+    }
+
+    @Composable
+    fun ControlCircleButton(color: Color, onClick: () -> Unit) {
+        Surface(
+            onClick = onClick,
+            modifier = Modifier.size(44.dp).shadow(6.dp, CircleShape).border(2.dp, Color.White.copy(0.4f), CircleShape),
+            shape = CircleShape,
+            color = color
+        ) { Box(modifier = Modifier.fillMaxSize()) }
+    }
+
+    @Composable
+    fun CommandItem(command: VoiceCommand, isDarkMode: Boolean, onDelete: () -> Unit, onEdit: () -> Unit) {
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp).shadow(8.dp, RoundedCornerShape(16.dp)).border(1.dp, if (command.isRoot) com.example.demonitalk.ui.theme.BrimstoneYellow.copy(0.3f) else Color.White.copy(0.05f), RoundedCornerShape(16.dp)),
+            colors = CardDefaults.cardColors(containerColor = if (isDarkMode) com.example.demonitalk.ui.theme.Obsidian else Color.White),
+            onClick = onEdit
+        ) {
+            Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = command.trigger.uppercase(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = if (command.isRoot) com.example.demonitalk.ui.theme.BrimstoneYellow else MaterialTheme.colorScheme.primary, letterSpacing = 1.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(text = command.action, style = MaterialTheme.typography.bodySmall, color = if (isDarkMode) AshGrey else Color.Gray)
                 }
+                IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, "Delete", tint = com.example.demonitalk.ui.theme.HellRed.copy(0.7f)) }
             }
+        }
+    }
+
+    @Composable
+    fun AddCommandDialog(commandToEdit: VoiceCommand? = null, onDismiss: () -> Unit, onAdd: (String, String, Boolean) -> Unit) {
+        var t by remember { mutableStateOf(commandToEdit?.trigger ?: "") }
+        var a by remember { mutableStateOf(commandToEdit?.action ?: "") }
+        var r by remember { mutableStateOf(commandToEdit?.isRoot ?: false) }
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            containerColor = com.example.demonitalk.ui.theme.Obsidian,
+            title = { Text(if (commandToEdit == null) "NUEVO PACTO" else "EDITAR PACTO", color = com.example.demonitalk.ui.theme.HellRed, fontWeight = FontWeight.Black) },
+            text = {
+                Column {
+                    TextField(value = t, onValueChange = { t = it }, label = { Text("Palabra Clave") })
+                    Spacer(Modifier.height(8.dp))
+                    TextField(value = a, onValueChange = { a = it }, label = { Text("Acción / Comando") })
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = r, onCheckedChange = { r = it })
+                        Text("Requiere Root 😈", color = com.example.demonitalk.ui.theme.BrimstoneYellow)
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { onAdd(t, a, r) }) { Text("SELLAR", fontWeight = FontWeight.Bold, color = com.example.demonitalk.ui.theme.HellRed) } },
+            dismissButton = { TextButton(onClick = onDismiss) { Text("CANCELAR", color = AshGrey) } }
+        )
+    }
+
+    @Composable
+    fun StorageDialog(onDismiss: () -> Unit, isEnglish: Boolean, onCommandsUpdated: (List<VoiceCommand>) -> Unit) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(if (isEnglish) "Storage" else "Almacenamiento") },
+            text = {
+                Column {
+                    Text("Limpiar caché de comandos y reiniciar base de datos.")
+                    IconButton(onClick = { repository.clearCache(); onCommandsUpdated(repository.loadCommands()); onDismiss() }) {
+                        Icon(Icons.Default.DeleteForever, "Clear", tint = Color.Red)
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = onDismiss) { Text("CERRAR") } }
         )
     }
 
     @Composable
     fun SettingsDialog(onDismiss: () -> Unit, isEnglish: Boolean) {
-        var path by remember { mutableStateOf(repository.getExportPath()) }
-
+        var p by remember { mutableStateOf(repository.getExportPath()) }
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text(if (isEnglish) "Settings ⚙️" else "Configuración ⚙️", style = MaterialTheme.typography.titleLarge) },
-            text = {
-                Column {
-                    Text(
-                        text = if (isEnglish) "Custom Export Path" else "Ruta de Exportación Custom",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TextField(value = path, onValueChange = { path = it }, placeholder = { Text(if (isEnglish) "e.g. /storage/emulated/0/Download" else "Ej: /storage/emulated/0/Download") }, modifier = Modifier.fillMaxWidth())
-                    Text(
-                        text = if (isEnglish) "If left empty, it will use Downloads by default." else "Si se deja vacío, usará Descargas por defecto.",
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    repository.saveExportPath(path)
-                    onDismiss()
-                }) {
-                    Text(if (isEnglish) "SAVE" else "GUARDAR")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onDismiss) {
-                    Text(if (isEnglish) "CANCEL" else "CANCELAR")
-                }
-            }
+            title = { Text(if (isEnglish) "Settings" else "Ajustes") },
+            text = { TextField(value = p, onValueChange = { p = it }, label = { Text("Ruta de Exportación") }) },
+            confirmButton = { TextButton(onClick = { repository.saveExportPath(p); onDismiss() }) { Text("GUARDAR") } }
         )
     }
 
     @Composable
     fun SuccessDialog(onDismiss: () -> Unit, isEnglish: Boolean) {
-        Dialog(onDismissRequest = onDismiss) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-                    .shadow(elevation = 24.dp, shape = RoundedCornerShape(24.dp), ambientColor = Color.Black, spotColor = Color.Black)
-                    .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(24.dp)),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(80.dp)
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape)
-                            .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = null,
-                            tint = Color(0xFF4CAF50),
-                            modifier = Modifier.size(48.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Text(
-                        text = if (isEnglish) "ENTRIES SAVED" else "ENTRADAS GUARDADAS",
-                        style = MaterialTheme.typography.headlineSmall.copy(
-                            fontWeight = FontWeight.ExtraBold,
-                            shadow = Shadow(color = Color.Black.copy(alpha = 0.3f), offset = Offset(2f, 2f), blurRadius = 4f)
-                        ),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = if (isEnglish) "Your configuration has been successfully exported to the Downloads folder." else "Tu configuración ha sido exportada con éxito a la carpeta de Descargas.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(32.dp))
-                    DemoniButton(text = if (isEnglish) "ACCEPT" else "ACEPTAR", onClick = onDismiss)
-                }
+        AlertDialog(onDismissRequest = onDismiss, confirmButton = { TextButton(onClick = onDismiss) { Text("OK") } }, title = { Text("Éxito") }, text = { Text("Operación completada.") })
+    }
+
+    @Composable
+    fun DrawerButton(text: String, icon: ImageVector, iconTint: Color = MaterialTheme.colorScheme.primary, onClick: () -> Unit) {
+        Surface(onClick = onClick, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(12.dp), color = Color.Transparent) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 16.dp)) {
+                Icon(icon, null, tint = iconTint)
+                Spacer(Modifier.width(16.dp))
+                Text(text, fontWeight = FontWeight.Medium)
             }
         }
     }
 
     @Composable
-    fun DrawerButton(
-        text: String,
-        icon: ImageVector,
-        onClick: () -> Unit
-    ) {
-        Surface(
-            onClick = onClick,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .shadow(elevation = 4.dp, shape = RoundedCornerShape(12.dp))
-                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp)),
-            shape = RoundedCornerShape(12.dp),
-            color = MaterialTheme.colorScheme.surface
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.width(16.dp))
-                Text(
-                    text = text,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
+    fun DemoniButton(text: String, containerColor: Color = MaterialTheme.colorScheme.primary, onClick: () -> Unit) {
+        Button(onClick = onClick, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = containerColor), elevation = ButtonDefaults.buttonElevation(8.dp)) {
+            Text(text.uppercase(), fontWeight = FontWeight.Black, fontSize = 12.sp)
         }
-    }
-
-    @Composable
-    fun DemoniButton(
-        text: String,
-        containerColor: Color = MaterialTheme.colorScheme.primary,
-        onClick: () -> Unit
-    ) {
-        val isDark = !MaterialTheme.colorScheme.background.copy(alpha = 1f).let { 
-            it.red + it.green + it.blue > 1.0f 
-        }
-
-        Button(
-            onClick = onClick,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-                .shadow(
-                    elevation = 16.dp, 
-                    shape = RoundedCornerShape(12.dp), // Un poco más "cuadrado" pero elegante
-                    ambientColor = Color.Black, 
-                    spotColor = Color.Black
-                )
-                .border(
-                    width = 1.5.dp, 
-                    color = Color.White.copy(alpha = if (isDark) 0.4f else 0.6f), // Brillo metálico
-                    shape = RoundedCornerShape(12.dp)
-                ),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = containerColor),
-            elevation = ButtonDefaults.buttonElevation(
-                defaultElevation = 10.dp,
-                pressedElevation = 2.dp
-            )
-        ) {
-            Text(
-                text = text, 
-                style = MaterialTheme.typography.titleMedium.copy(
-                    shadow = Shadow(color = Color.Black.copy(alpha = 0.3f), offset = Offset(2f, 2f), blurRadius = 4f)
-                ),
-                fontWeight = FontWeight.Bold
-            )
-        }
-    }
-
-    @Composable
-    fun CommandItem(
-        command: VoiceCommand,
-        modifier: Modifier = Modifier,
-        onDelete: () -> Unit,
-        onEdit: () -> Unit
-    ) {
-        val isDark = MaterialTheme.colorScheme.background.let { it.red + it.green + it.blue < 1.0f }
-        
-        Card(
-            modifier = modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = if (isDark) Color(0xFF1A1A1A) else Color.White,
-                contentColor = MaterialTheme.colorScheme.onSurface
-            ),
-            elevation = CardDefaults.cardElevation(
-                defaultElevation = 6.dp,
-                pressedElevation = 2.dp
-            ),
-            border = BorderStroke(
-                width = 1.dp, 
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-            ),
-            onClick = onEdit
-        ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "Trigger: ${command.trigger}", style = MaterialTheme.typography.titleMedium)
-                    Text(text = "Action: ${command.action}", style = MaterialTheme.typography.bodySmall)
-                    if (command.isRoot) {
-                        Text(
-                            text = "ROOT ACCESS", 
-                            color = MaterialTheme.colorScheme.tertiary, 
-                            style = MaterialTheme.typography.labelLarge,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                    }
-                }
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier
-                        .padding(start = 8.dp)
-                        .size(40.dp)
-                        .border(
-                            width = 1.dp, 
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), // Igual que el borde de tarjetas
-                            shape = CircleShape
-                        )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete, 
-                        contentDescription = "Delete",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
-    }
-
-    @Composable
-    fun AddCommandDialog(
-        commandToEdit: VoiceCommand? = null,
-        onDismiss: () -> Unit, 
-        onAdd: (String, String, Boolean) -> Unit
-    ) {
-        var trigger by remember { mutableStateOf(commandToEdit?.trigger ?: "") }
-        var action by remember { mutableStateOf(commandToEdit?.action ?: "") }
-        var isRoot by remember { mutableStateOf(commandToEdit?.isRoot ?: false) }
-
-        AlertDialog(
-            onDismissRequest = onDismiss,
-            title = { Text(if (commandToEdit == null) "Add Command" else "Edit Command") },
-            text = {
-                Column {
-                    TextField(value = trigger, onValueChange = { trigger = it }, label = { Text("Trigger Word") })
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TextField(
-                        value = action, 
-                        onValueChange = { action = it }, 
-                        label = { Text("Action (Pkg, Monkey, Bash, etc.)") },
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp, max = 150.dp),
-                        maxLines = 5
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = isRoot, onCheckedChange = { isRoot = it })
-                        Text("Root Command")
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { if(trigger.isNotBlank() && action.isNotBlank()) onAdd(trigger, action, isRoot) }) {
-                    Text(if (commandToEdit == null) "Add" else "Save")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onDismiss) {
-                    Text("Cancel")
-                }
-            }
-        )
     }
 
     private fun startFloatingService() {
         if (Settings.canDrawOverlays(this)) {
             val intent = Intent(this, FloatingButtonService::class.java)
-            startForegroundService(intent)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
         } else {
-            Toast.makeText(this, "Permission required to draw overlay", Toast.LENGTH_SHORT).show()
-            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                "package:$packageName".toUri())
+            // Solo aquí pedimos el permiso, porque el usuario pulsó el botón manualmente
+            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, "package:$packageName".toUri())
             startActivity(intent)
+            Toast.makeText(this, "Concede el permiso para mostrar el botón flotante", Toast.LENGTH_LONG).show()
         }
     }
 
     private fun requestRoot() {
         Thread {
             try {
-                val process = Runtime.getRuntime().exec("su")
-                val os = java.io.DataOutputStream(process.outputStream)
-                os.writeBytes("exit\n")
-                os.flush()
-                runOnUiThread {
-                    Toast.makeText(this, "Root request sent. Check Magisk/SU", Toast.LENGTH_SHORT).show()
-                }
-            } catch (_: Exception) {
-                runOnUiThread {
-                    Toast.makeText(this, "Root failed or not available", Toast.LENGTH_SHORT).show()
-                }
-            }
+                ShellUtils.resetRootCache()
+                val available = ShellUtils.isRootAvailable()
+                runOnUiThread { Toast.makeText(this, if (available) "Root Granted! 😈" else "Root Denied", Toast.LENGTH_SHORT).show() }
+            } catch (e: Exception) { runOnUiThread { Toast.makeText(this, "Root Error", Toast.LENGTH_SHORT).show() } }
         }.start()
+    }
+
+    private fun sendControlIntent(action: String) {
+        val intent = Intent(this, FloatingButtonService::class.java).apply { this.action = action }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
+    }
+
+    private fun checkAndOpenAccessibility() {
+        if (!isAccessibilityEnabled()) {
+            Toast.makeText(this, "Habilita DemoniTalk en Accesibilidad", Toast.LENGTH_LONG).show()
+            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            startActivity(intent)
+        } else {
+            Toast.makeText(this, "Accesibilidad ya activada 😈", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun isAccessibilityEnabled(): Boolean {
+        val service = "$packageName/${DemoniAccessibilityService::class.java.canonicalName}"
+        val enabled = Settings.Secure.getInt(contentResolver, Settings.Secure.ACCESSIBILITY_ENABLED, 0)
+        if (enabled == 1) {
+            val settingValue = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+            return settingValue?.contains(service) == true
+        }
+        return false
     }
 }

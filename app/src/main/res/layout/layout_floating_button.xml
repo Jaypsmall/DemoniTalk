@@ -9,10 +9,10 @@
 
     <ImageView
         android:id="@+id/mic_button"
-        android:layout_width="37dp"
-        android:layout_height="35dp"
-        android:background="@drawable/bg_floating_button"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
         android:contentDescription="Demoni"
         android:elevation="12dp"
-        android:padding="12dp" />
+        android:src="@drawable/rojo"
+        android:padding="4dp" />
 </FrameLayout>

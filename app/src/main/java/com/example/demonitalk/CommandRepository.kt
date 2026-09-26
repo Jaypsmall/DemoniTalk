@@ -4,6 +4,7 @@ import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import java.io.File
+import androidx.core.content.edit
 
 class CommandRepository(private val context: Context) {
     private val gson = Gson()
@@ -11,9 +12,27 @@ class CommandRepository(private val context: Context) {
     private val COMMANDS_KEY = "commands"
     private val DARK_MODE_KEY = "dark_mode"
     private val EXPORT_PATH_KEY = "export_path"
+    private val GEMINI_API_KEY = "gemini_api_key"
+    private val AI_ENABLED_KEY = "ai_enabled"
+
+    fun saveAiEnabled(enabled: Boolean) {
+        prefs.edit { putBoolean(AI_ENABLED_KEY, enabled) }
+    }
+
+    fun isAiEnabled(): Boolean {
+        return prefs.getBoolean(AI_ENABLED_KEY, true)
+    }
+
+    fun saveGeminiApiKey(key: String) {
+        prefs.edit { putString(GEMINI_API_KEY, key) }
+    }
+
+    fun getGeminiApiKey(): String {
+        return prefs.getString(GEMINI_API_KEY, "") ?: ""
+    }
 
     fun saveDarkMode(enabled: Boolean) {
-        prefs.edit().putBoolean(DARK_MODE_KEY, enabled).apply()
+        prefs.edit { putBoolean(DARK_MODE_KEY, enabled) }
     }
 
     fun isDarkMode(): Boolean {
@@ -21,7 +40,7 @@ class CommandRepository(private val context: Context) {
     }
 
     fun saveExportPath(path: String) {
-        prefs.edit().putString(EXPORT_PATH_KEY, path).apply()
+        prefs.edit { putString(EXPORT_PATH_KEY, path) }
     }
 
     fun getExportPath(): String {
@@ -29,11 +48,11 @@ class CommandRepository(private val context: Context) {
     }
 
     fun saveCommands(commands: List<VoiceCommand>) {
-        prefs.edit().putString(COMMANDS_KEY, gson.toJson(commands)).apply()
+        prefs.edit { putString(COMMANDS_KEY, gson.toJson(commands)) }
     }
 
     fun clearCache() {
-        prefs.edit().remove(COMMANDS_KEY).apply()
+        prefs.edit { remove(COMMANDS_KEY) }
     }
 
     fun getBackupFiles(): List<File> {
@@ -54,7 +73,7 @@ class CommandRepository(private val context: Context) {
             val type = object : TypeToken<List<VoiceCommand>>() {}.type
             try {
                 gson.fromJson<List<VoiceCommand>>(json, type)
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 getDefaultCommands()
             }
         }
@@ -82,7 +101,9 @@ class CommandRepository(private val context: Context) {
             VoiceCommand("reboot", "reboot", true),
             VoiceCommand("ajustes", "com.android.settings"),
             VoiceCommand("activar escucha", "internal_continuous_on"),
-            VoiceCommand("desactivar escucha", "internal_continuous_off"),
+            VoiceCommand("desactivar escucha", "internal_stop"),
+            VoiceCommand("activa c4", "internal_mode_blue"),
+            VoiceCommand("modo azul", "internal_mode_blue"),
             VoiceCommand("encender foco", "torch_on"),
             VoiceCommand("apagar foco", "torch_off"),
             VoiceCommand("primer chat", "click_first_chat"),
