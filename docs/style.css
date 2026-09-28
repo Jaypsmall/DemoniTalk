@@ -2,6 +2,7 @@
    DEMONITALK WEBSITE
    Global Theme
 ===================================================== */
+
 :root {
 
   --bg: #070707;
@@ -24,6 +25,7 @@
 
   --button-text: #ffffff;
 }
+
 
 
 /* =====================================================
@@ -52,20 +54,27 @@ body.light {
 }
 
 
+
 /* =====================================================
    RESET
 ===================================================== */
 
 * {
+
   box-sizing: border-box;
 
   margin: 0;
   padding: 0;
+
 }
 
 
 html {
+
   scroll-behavior: smooth;
+
+  scroll-padding-top: 90px;
+
 }
 
 
@@ -89,14 +98,30 @@ body {
   transition:
     background 0.35s ease,
     color 0.35s ease;
+
 }
 
 
 a {
+
   color: inherit;
+
   text-decoration: none;
+
 }
 
+
+button {
+
+  font-family: inherit;
+
+}
+
+
+
+/* =====================================================
+   CONTAINER
+===================================================== */
 
 .container {
 
@@ -104,28 +129,434 @@ a {
 
   margin-left: auto;
   margin-right: auto;
+
 }
+
+
+
+/* =====================================================
+   NAVIGATION
+===================================================== */
+
+.navbar {
+
+  position: fixed;
+
+  top: 0;
+  left: 0;
+
+  width: 100%;
+
+  z-index: 1000;
+
+  background:
+    rgba(7, 7, 7, 0.88);
+
+  border-bottom:
+    1px solid var(--border);
+
+  backdrop-filter:
+    blur(14px);
+
+  -webkit-backdrop-filter:
+    blur(14px);
+
+  transition:
+    background 0.35s ease,
+    border 0.35s ease;
+
+}
+
+
+body.light .navbar {
+
+  background:
+    rgba(255, 255, 255, 0.88);
+
+}
+
+
+
+.nav-container {
+
+  width: min(1200px, 94%);
+
+  min-height: 68px;
+
+  margin: 0 auto;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 20px;
+
+}
+
+
+
+/* =====================================================
+   NAV BRAND
+===================================================== */
+
+.nav-brand {
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 9px;
+
+  flex-shrink: 0;
+
+  font-weight: 900;
+
+}
+
+
+.nav-brand-icon {
+
+  font-size: 25px;
+
+  filter:
+    drop-shadow(
+      0 0 8px rgba(255, 32, 32, 0.45)
+    );
+
+}
+
+
+.nav-brand-text {
+
+  font-size: 20px;
+
+  letter-spacing: -0.8px;
+
+}
+
+
+
+/* =====================================================
+   NAV LINKS
+===================================================== */
+
+.nav-links {
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: flex-end;
+
+  gap: 5px;
+
+}
+
+
+.nav-link {
+
+  position: relative;
+
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  gap: 6px;
+
+  min-height: 42px;
+
+  padding: 8px 12px;
+
+  border: 1px solid transparent;
+
+  border-radius: 8px;
+
+  background: transparent;
+
+  color: var(--text-secondary);
+
+  font-size: 11px;
+
+  font-weight: 800;
+
+  letter-spacing: 0.8px;
+
+  cursor: pointer;
+
+  transition:
+    color 0.2s ease,
+    background 0.2s ease,
+    border 0.2s ease;
+
+}
+
+
+.nav-link:hover {
+
+  color: var(--text);
+
+  background: var(--card);
+
+  border-color: var(--border);
+
+}
+
+
+.nav-link::after {
+
+  content: "";
+
+  position: absolute;
+
+  bottom: 2px;
+
+  left: 12px;
+  right: 12px;
+
+  height: 2px;
+
+  background: var(--accent);
+
+  transform:
+    scaleX(0);
+
+  transform-origin: center;
+
+  transition:
+    transform 0.2s ease;
+
+}
+
+
+.nav-link:hover::after {
+
+  transform:
+    scaleX(1);
+
+}
+
+
+
+/* =====================================================
+   DEMONI APPS MENU
+===================================================== */
+
+.apps-menu {
+
+  position: relative;
+
+}
+
+
+.apps-button {
+
+  appearance: none;
+
+}
+
+
+.dropdown-arrow {
+
+  font-size: 8px;
+
+  transition:
+    transform 0.25s ease;
+
+}
+
+
+.apps-button[aria-expanded="true"]
+.dropdown-arrow {
+
+  transform:
+    rotate(180deg);
+
+}
+
+
+
+/* =====================================================
+   DROPDOWN
+===================================================== */
+
+.apps-dropdown {
+
+  position: absolute;
+
+  top: calc(100% + 9px);
+
+  right: 0;
+
+  width: 245px;
+
+  padding: 7px;
+
+  background: var(--card);
+
+  border: 1px solid var(--border);
+
+  border-radius: 13px;
+
+  box-shadow:
+    0 18px 45px var(--shadow);
+
+  opacity: 0;
+
+  visibility: hidden;
+
+  transform:
+    translateY(-8px)
+    scale(0.97);
+
+  transform-origin:
+    top right;
+
+  transition:
+    opacity 0.2s ease,
+    visibility 0.2s ease,
+    transform 0.2s ease;
+
+}
+
+
+.apps-dropdown.open {
+
+  opacity: 1;
+
+  visibility: visible;
+
+  transform:
+    translateY(0)
+    scale(1);
+
+}
+
+
+
+/* =====================================================
+   APP ITEM
+===================================================== */
+
+.app-item {
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 11px;
+
+  padding: 11px;
+
+  border-radius: 9px;
+
+  border: 1px solid transparent;
+
+  transition:
+    background 0.2s ease,
+    border 0.2s ease,
+    transform 0.2s ease;
+
+}
+
+
+.app-item:hover {
+
+  background: var(--card-hover);
+
+  border-color: var(--border);
+
+  transform:
+    translateX(3px);
+
+}
+
+
+.app-icon {
+
+  width: 36px;
+  height: 36px;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  flex-shrink: 0;
+
+  border-radius: 9px;
+
+  background: var(--bg-secondary);
+
+  border: 1px solid var(--border);
+
+  font-size: 19px;
+
+}
+
+
+.app-info {
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: flex-start;
+
+  line-height: 1.2;
+
+}
+
+
+.app-info strong {
+
+  color: var(--text);
+
+  font-size: 14px;
+
+}
+
+
+.app-info small {
+
+  margin-top: 3px;
+
+  color: var(--text-secondary);
+
+  font-size: 11px;
+
+}
+
+
+.current-app {
+
+  border-color:
+    rgba(255, 32, 32, 0.25);
+
+}
+
+
+.current-app .app-info strong {
+
+  color: var(--accent);
+
+}
+
 
 
 /* =====================================================
    THEME BUTTON
 ===================================================== */
 
-nav {
-
-  position: fixed;
-
-  top: 18px;
-  right: 18px;
-
-  z-index: 1000;
-}
-
-
 .theme-button {
 
-  width: 48px;
-  height: 48px;
+  width: 42px;
+  height: 42px;
+
+  flex-shrink: 0;
 
   border-radius: 50%;
 
@@ -137,7 +568,12 @@ nav {
 
   cursor: pointer;
 
-  font-size: 21px;
+  font-size: 18px;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
 
   box-shadow:
     0 8px 30px var(--shadow);
@@ -145,14 +581,19 @@ nav {
   transition:
     transform 0.2s ease,
     background 0.35s ease,
-    color 0.35s ease;
+    color 0.35s ease,
+    border 0.35s ease;
+
 }
 
 
 .theme-button:hover {
 
-  transform: scale(1.08);
+  transform:
+    scale(1.08);
+
 }
+
 
 
 /* =====================================================
@@ -162,6 +603,8 @@ nav {
 header {
 
   min-height: 90vh;
+
+  padding-top: 68px;
 
   display: flex;
 
@@ -180,11 +623,14 @@ header {
       rgba(255, 0, 0, 0.33),
       transparent 45%
     );
+
 }
 
 
 .hero {
+
   max-width: 650px;
+
 }
 
 
@@ -198,7 +644,9 @@ header {
     drop-shadow(
       0 0 15px rgba(255, 0, 0, 0.55)
     );
+
 }
+
 
 
 /* =====================================================
@@ -207,7 +655,8 @@ header {
 
 .logo-title {
 
-  font-size: clamp(42px, 8vw, 78px);
+  font-size:
+    clamp(42px, 8vw, 78px);
 
   font-weight: 800;
 
@@ -216,10 +665,9 @@ header {
   line-height: 1;
 
   margin-bottom: 18px;
+
 }
 
-
-/* De = RED */
 
 .de {
 
@@ -227,10 +675,9 @@ header {
 
   text-shadow:
     0 0 18px rgba(255, 32, 32, 0.45);
+
 }
 
-
-/* moni = YELLOW */
 
 .moni {
 
@@ -238,10 +685,9 @@ header {
 
   text-shadow:
     0 0 18px rgba(255, 214, 0, 0.33);
+
 }
 
-
-/* Talk = WHITE in dark mode */
 
 .talk {
 
@@ -253,17 +699,18 @@ header {
   transition:
     color 0.35s ease,
     text-shadow 0.35s ease;
+
 }
 
-
-/* Talk = BLACK in light mode */
 
 body.light .talk {
 
   color: #111111;
 
   text-shadow: none;
+
 }
+
 
 
 /* =====================================================
@@ -286,7 +733,9 @@ body.light .talk {
 
   transition:
     color 0.35s ease;
+
 }
+
 
 
 /* =====================================================
@@ -297,13 +746,16 @@ body.light .talk {
 
   color: var(--text-secondary);
 
-  font-size: clamp(17px, 2.5vw, 21px);
+  font-size:
+    clamp(17px, 2.5vw, 21px);
 
   max-width: 720px;
 
   margin-left: auto;
   margin-right: auto;
+
 }
+
 
 
 /* =====================================================
@@ -321,6 +773,7 @@ body.light .talk {
   justify-content: center;
 
   flex-wrap: wrap;
+
 }
 
 
@@ -343,12 +796,15 @@ body.light .talk {
     transform 0.2s ease,
     background 0.3s ease,
     border 0.3s ease;
+
 }
 
 
 .button:hover {
 
-  transform: translateY(-2px);
+  transform:
+    translateY(-2px);
+
 }
 
 
@@ -359,12 +815,14 @@ body.light .talk {
   color: var(--button-text);
 
   border-color: var(--accent);
+
 }
 
 
 .primary:hover {
 
   background: var(--accent-hover);
+
 }
 
 
@@ -373,7 +831,9 @@ body.light .talk {
   background: var(--card);
 
   color: var(--text);
+
 }
+
 
 
 /* =====================================================
@@ -383,6 +843,7 @@ body.light .talk {
 section {
 
   padding: 30px 0;
+
 }
 
 
@@ -393,13 +854,16 @@ section {
   font-size: 34px;
 
   margin-bottom: 35px;
+
 }
 
 
 .section-title span {
 
   color: var(--accent);
+
 }
+
 
 
 /* =====================================================
@@ -414,6 +878,7 @@ section {
     repeat(2, minmax(0, 1fr));
 
   gap: 28px;
+
 }
 
 
@@ -434,12 +899,15 @@ section {
     background 0.35s ease,
     border 0.35s ease,
     transform 0.25s ease;
+
 }
 
 
 .screenshot-card:hover {
 
-  transform: translateY(-5px);
+  transform:
+    translateY(-5px);
+
 }
 
 
@@ -455,7 +923,9 @@ section {
 
   transition:
     opacity 0.2s ease;
+
 }
+
 
 
 /* =====================================================
@@ -470,6 +940,7 @@ section {
     repeat(2, minmax(0, 1fr));
 
   gap: 20px;
+
 }
 
 
@@ -487,12 +958,15 @@ section {
     background 0.35s ease,
     border 0.35s ease,
     transform 0.25s ease;
+
 }
 
 
 .feature:hover {
 
-  transform: translateY(-4px);
+  transform:
+    translateY(-4px);
+
 }
 
 
@@ -501,19 +975,23 @@ section {
   font-size: 28px;
 
   margin-bottom: 10px;
+
 }
 
 
 .feature h3 {
 
   margin-bottom: 8px;
+
 }
 
 
 .feature p {
 
   color: var(--text-secondary);
+
 }
+
 
 
 /* =====================================================
@@ -531,6 +1009,7 @@ section {
   transition:
     background 0.35s ease,
     border 0.35s ease;
+
 }
 
 
@@ -542,6 +1021,7 @@ section {
     repeat(4, minmax(0, 1fr));
 
   gap: 20px;
+
 }
 
 
@@ -560,12 +1040,14 @@ section {
   transition:
     background 0.35s ease,
     border 0.35s ease;
+
 }
 
 
 .requirement-icon {
 
   font-size: 28px;
+
 }
 
 
@@ -574,6 +1056,7 @@ section {
   display: block;
 
   margin-top: 8px;
+
 }
 
 
@@ -582,6 +1065,7 @@ section {
   color: var(--text-secondary);
 
   font-size: 14px;
+
 }
 
 
@@ -596,7 +1080,9 @@ section {
   font-size: 14px;
 
   text-align: center;
+
 }
+
 
 
 /* =====================================================
@@ -610,6 +1096,7 @@ footer {
   text-align: center;
 
   color: var(--text-secondary);
+
 }
 
 
@@ -620,6 +1107,7 @@ footer {
   font-weight: 900;
 
   margin-bottom: 8px;
+
 }
 
 
@@ -630,66 +1118,214 @@ footer {
   font-weight: 800;
 
   margin-bottom: 12px;
+
 }
 
 
 footer p {
 
   margin-top: 5px;
+
 }
+
 
 
 /* =====================================================
    MOBILE
 ===================================================== */
 
-@media (max-width: 700px) {
+@media (max-width: 800px) {
+
+
+  .nav-container {
+
+    min-height: 62px;
+
+    width: 94%;
+
+  }
+
+
+  .nav-brand-text {
+
+    display: none;
+
+  }
+
+
+  .nav-links {
+
+    gap: 2px;
+
+  }
+
+
+  .nav-link {
+
+    min-height: 38px;
+
+    padding:
+      7px 8px;
+
+    font-size: 9px;
+
+    letter-spacing: 0.4px;
+
+  }
+
+
+  .theme-button {
+
+    width: 38px;
+    height: 38px;
+
+    font-size: 16px;
+
+  }
+
+
+  .apps-dropdown {
+
+    right: 0;
+
+    width: 230px;
+
+  }
+
+
+  header {
+
+    padding-top: 62px;
+
+  }
+
 
   .screenshots,
   .features,
   .requirements-box {
 
     grid-template-columns: 1fr;
+
   }
 
 
   .logo-icon {
 
     font-size: 60px;
+
   }
 
 
   .logo-title {
 
-    font-size: clamp(40px, 13vw, 62px);
+    font-size:
+      clamp(40px, 13vw, 62px);
 
     letter-spacing: -2px;
+
   }
 
 
   section {
 
     padding: 45px 0;
+
   }
 
 
   .section-title {
 
     font-size: 29px;
+
+  }
+
+}
+
+
+
+/* =====================================================
+   SMALL MOBILE
+===================================================== */
+
+@media (max-width: 560px) {
+
+
+  .nav-container {
+
+    gap: 5px;
+
   }
 
 
-  nav {
+  .nav-brand {
 
-    top: 12px;
-    right: 12px;
+    display: none;
+
+  }
+
+
+  .nav-links {
+
+    width: 100%;
+
+    justify-content: center;
+
+  }
+
+
+  .nav-link {
+
+    padding:
+      6px 5px;
+
+    font-size: 8px;
+
+  }
+
+
+  .apps-button {
+
+    padding-left: 7px;
+    padding-right: 7px;
+
   }
 
 
   .theme-button {
 
-    width: 44px;
-    height: 44px;
+    width: 36px;
+    height: 36px;
+
+  }
+
+
+  .apps-dropdown {
+
+    position: fixed;
+
+    top: 57px;
+
+    right: 8px;
+
+    width:
+      min(250px, calc(100vw - 16px));
+
+  }
+
+
+  .buttons {
+
+    flex-direction: column;
+
+    align-items: stretch;
+
+  }
+
+
+  .button {
+
+    width: 100%;
+
   }
 
 }
