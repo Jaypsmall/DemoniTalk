@@ -286,7 +286,7 @@ class MainActivity : ComponentActivity() {
                     }
 
                     Card(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp).border(1.dp, Color.White.copy(0.05f), RoundedCornerShape(16.dp)),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp).border(1.dp, com.example.demonitalk.ui.theme.HellRed.copy(0.3f), RoundedCornerShape(16.dp)),
                         colors = CardDefaults.cardColors(containerColor = if (isDarkMode) com.example.demonitalk.ui.theme.Obsidian else Color.White.copy(0.9f)),
                         shape = RoundedCornerShape(16.dp),
                         elevation = CardDefaults.cardElevation(4.dp)
@@ -422,7 +422,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun CommandItem(command: VoiceCommand, isDarkMode: Boolean, onDelete: () -> Unit, onEdit: () -> Unit) {
         Card(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp).shadow(8.dp, RoundedCornerShape(16.dp)).border(1.dp, if (command.isRoot) com.example.demonitalk.ui.theme.BrimstoneYellow.copy(0.3f) else Color.White.copy(0.05f), RoundedCornerShape(16.dp)),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp).shadow(8.dp, RoundedCornerShape(16.dp)).border(1.dp, if (command.isRoot) com.example.demonitalk.ui.theme.BrimstoneYellow.copy(0.3f) else com.example.demonitalk.ui.theme.HellRed.copy(0.3f), RoundedCornerShape(16.dp)),
             colors = CardDefaults.cardColors(containerColor = if (isDarkMode) com.example.demonitalk.ui.theme.Obsidian else Color.White),
             onClick = onEdit
         ) {
