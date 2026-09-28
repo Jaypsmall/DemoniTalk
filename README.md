@@ -1,18 +1,18 @@
-# 😈 DemoniTalk (v1.0.3 - Demonic Edition)   ![Android](https://img.shields.io/badge/Android-181717?style=flat&logo=android&logoColor=yellow) ![Kotlin](https://img.shields.io/badge/kotlin-181717?style=flat&logo=kotlin&logoColor=yellow) 
+# 😈 DemoniTalk (v2.0.1 - DemonicAI Edition)   ![Android](https://img.shields.io/badge/Android-181717?style=flat&logo=android&logoColor=yellow) ![Kotlin](https://img.shields.io/badge/kotlin-181717?style=flat&logo=kotlin&logoColor=yellow) 
 
 **😈 DemoniTalk** Apk is an advanced voice assistant and automation engine for Android that requires root privileges. It allows you to map custom voice commands ("Triggers") to instantly execute console scripts, touch simulation macros, and low-level system process controls via a floating interface.
 
+* **https://github.com/Jaypsmall/DemoniTalk/releases/download/demoni/DemoniTalk_v2.0.1_AI.apk**
+
+**DemoniTalk (v1.0.3) in releases**
+
 * **https://github.com/Jaypsmall/DemoniTalk/releases/download/root/DemoniTalk_v1.0.3.apk**
-
-**DemoniTalk (v2.0.1) in releases**
-
-* **https://github.com/Jaypsmall/DemoniTalk/releases/download/root/DemoniTalk_v2.0.1.apk**
 
 ---
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/e728adac-3cd9-4ed4-9d7b-88f2da9cca68" width="49%" />
-  <img src="https://github.com/user-attachments/assets/1feaade7-f9d6-4ce1-8829-be88116456e5" width="49%" />
+  <img src="https://github.com/Jaypsmall/DemoniTalk/blob/master-v2/assets/1.png" width="49%" />
+  <img src="https://github.com/Jaypsmall/DemoniTalk/blob/master-v2/assets/2.png" width="49%" />
 </p>
 
 ---
@@ -32,8 +32,8 @@
 ---
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/85741729-884d-4b14-8111-38ef63084380" width="49%" />
-  <img src="https://github.com/user-attachments/assets/48a53de2-e572-4c50-a761-2409a387336b" width="49%" />  
+  <img src="https://github.com/Jaypsmall/DemoniTalk/blob/master-v2/assets/4.png" width="49%" />
+  <img src="https://github.com/Jaypsmall/DemoniTalk/blob/master-v2/assets/5.png" width="49%" />  
 </p>
 
 ---
