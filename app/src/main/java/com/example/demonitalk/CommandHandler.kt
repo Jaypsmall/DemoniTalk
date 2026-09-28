@@ -21,9 +21,15 @@ class CommandHandler(context: Context) {
      * - elimina tildes
      * - convierte a minúsculas
      * - elimina espacios sobrantes
-     * - unifica algunas palabras utilizadas como wake word
+     * - unifica palabras utilizadas como wake word
+     *
+     * IMPORTANTE:
+     * Solo sustituye palabras completas.
+     * Así "demoni" puede convertirse en "maquina",
+     * pero "demonizar" NO se modifica.
      */
     private fun String.normalize(): String {
+
         val nfdNormalizedString =
             Normalizer.normalize(this, Normalizer.Form.NFD)
 
@@ -38,11 +44,11 @@ class CommandHandler(context: Context) {
             .replace(Regex("\\s+"), " ")
 
         return base
-            .replace("demonio", "maquina")
-            .replace("demoni talk", "maquina")
-            .replace("demoni", "maquina")
-            .replace("puta", "maquina")
-            .replace("p***", "maquina")
+            .replace(Regex("""\bdemonio\b"""), "maquina")
+            .replace(Regex("""\bdemoni\s+talk\b"""), "maquina")
+            .replace(Regex("""\bdemoni\b"""), "maquina")
+            .replace(Regex("""\bputa\b"""), "maquina")
+            .replace(Regex("""\bp\*\*\*\b"""), "maquina")
             .trim()
     }
 

@@ -1,5 +1,6 @@
 package com.example.demonitalk
 
+import android.os.Build
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.content.Intent
@@ -136,9 +137,33 @@ class DemoniAccessibilityService : AccessibilityService() {
                 if (speechRecognizer == null) {
 
                     speechRecognizer =
-                        SpeechRecognizer.createSpeechRecognizer(
-                            applicationContext
-                        )
+                        if (
+                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                            SpeechRecognizer.isOnDeviceRecognitionAvailable(
+                                applicationContext
+                            )
+                        ) {
+
+                            Log.i(
+                                TAG,
+                                "Reconocimiento ON-DEVICE disponible. Usando motor local."
+                            )
+
+                            SpeechRecognizer.createOnDeviceSpeechRecognizer(
+                                applicationContext
+                            )
+
+                        } else {
+
+                            Log.w(
+                                TAG,
+                                "Reconocimiento ON-DEVICE no disponible. Usando reconocedor del sistema."
+                            )
+
+                            SpeechRecognizer.createSpeechRecognizer(
+                                applicationContext
+                            )
+                        }
 
                     speechRecognizer?.setRecognitionListener(
                         speechListener

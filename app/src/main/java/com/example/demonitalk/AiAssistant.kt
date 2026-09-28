@@ -32,7 +32,9 @@ class AiAssistant(context: Context) {
 
         // 1. Si el usuario ingresó clave de Gemini, la probamos
         if (apiKey.isNotEmpty()) {
-            val modelsToTry = listOf("gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-pro")
+            val modelsToTry = listOf(
+                "gemini-3.8-flash"
+            )
 
             for (modelName in modelsToTry) {
                 try {
