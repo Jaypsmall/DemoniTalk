@@ -1,6 +1,6 @@
 # 😈 DemoniTalk (v2.0.1 - DemonicAI Edition)   ![Android](https://img.shields.io/badge/Android-181717?style=flat&logo=android&logoColor=yellow) ![Kotlin](https://img.shields.io/badge/kotlin-181717?style=flat&logo=kotlin&logoColor=yellow) 
 
-**😈 DemoniTalk** Apk is an advanced voice assistant and automation engine for Android that requires root privileges. It allows you to map custom voice commands ("Triggers") to instantly execute console scripts, touch simulation macros, and low-level system process controls via a floating interface.
+**😈 DemoniTalk** Apk es un asistente de voz avanzado y un motor de automatización para Android que requiere permisos de superusuario. Permite asignar comandos de voz personalizados ("Activadores") para ejecutar instantáneamente scripts de consola, macros de simulación táctil y controles de procesos del sistema de bajo nivel mediante una interfaz flotante.
 
 * **https://github.com/Jaypsmall/DemoniTalk/releases/download/demoni/DemoniTalk_v2.0.1_AI.apk**
 
