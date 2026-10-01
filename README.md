@@ -46,7 +46,7 @@
 
 ---
 
-## 📄 Licencia y derechos de autor
+## 📄 Licencia y Copyright 
 
 Todos los derechos reservados © 2026.
  
