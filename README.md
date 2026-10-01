@@ -38,17 +38,18 @@
 
 ---
 
-## 🛠️ Technical Stack & Requirements
+## 🛠️ Pila técnica y requisitos 
 
-* **Infrastructure:** Requires full Superuser access (Magisk / KernelSU) for command injection into the Android terminal.
-* **Accessibility / Window Services:** Screen overlay permission to display the floating microphone widget in real-time.
-* **Ecosystem:** Includes a custom parser to import and export your macro lists via local configuration files.
+* **Infraestructura:** Requiere acceso de superusuario completo (Magisk / KernelSU) para la inyección de comandos en la terminal de Android. 
+* **Accesibilidad / Servicios de ventana:** Permiso de superposición de pantalla para mostrar el widget de micrófono flotante en tiempo real. 
+* **Ecosistema:** Incluye un analizador personalizado para importar y exportar sus listas de macros a través de archivos de configuración locales.
 
 ---
 
 ## 📄 Licencia y derechos de autor
 
-Todos los derechos reservados © 2026. 
+Todos los derechos reservados © 2026.
+ 
 El código fuente de esta aplicación es propiedad privada del desarrollador. Se prohíbe la reproducción, distribución o modificación no autorizada de este software.
 
 *Desarrollado con 🧡 por un desarrollador independiente.*
