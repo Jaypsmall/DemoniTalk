@@ -11,11 +11,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -39,8 +40,12 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.NightsStay
+import androidx.compose.material.icons.filled.Settings as SettingsIcon
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -63,7 +68,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
@@ -120,10 +124,10 @@ class MainActivity : ComponentActivity() {
 
     private val requestPermissionLauncher by lazy {
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-        if (!isGranted) {
-            Toast.makeText(this, "Permission denied for recording audio", Toast.LENGTH_SHORT).show()
+            if (!isGranted) {
+                Toast.makeText(this, "Permission denied for recording audio", Toast.LENGTH_SHORT).show()
+            }
         }
-    }
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -136,6 +140,7 @@ class MainActivity : ComponentActivity() {
         var showSettingsDialog by remember { mutableStateOf(false) }
         var showStorageDialog by remember { mutableStateOf(false) }
         var showAiDialog by remember { mutableStateOf(false) }
+        var showHelpDialog by remember { mutableStateOf(false) }
         var isEnglish by remember { mutableStateOf(false) }
         
         val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -214,20 +219,22 @@ class MainActivity : ComponentActivity() {
                         Text(text = demoniTitle, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(vertical = 32.dp))
                         HorizontalDivider(modifier = Modifier.padding(bottom = 32.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
                         
-                        DrawerButton(text = if (isEnglish) "Settings" else "Ajustes", icon = Icons.Default.Menu) { showSettingsDialog = true; scope.launch { drawerState.close() } }
+                        DrawerButton(text = if (isEnglish) "Settings" else "Ajustes", icon = Icons.Default.SettingsIcon) { showSettingsDialog = true; scope.launch { drawerState.close() } }
                         Spacer(modifier = Modifier.height(16.dp))
-                        DrawerButton(text = if (isEnglish) "Languages" else "Idiomas", icon = Icons.Default.Menu) { isEnglish = !isEnglish }
+                        DrawerButton(text = if (isEnglish) "Languages" else "Idiomas", icon = Icons.Default.Language) { isEnglish = !isEnglish }
                         Spacer(modifier = Modifier.height(16.dp))
                         DrawerButton(text = if (isEnglish) "Import" else "Importar", icon = Icons.Default.Upload) { importLauncher.launch("*/*"); scope.launch { drawerState.close() } }
                         Spacer(modifier = Modifier.height(16.dp))
                         DrawerButton(text = if (isEnglish) "Export" else "Exportar", icon = Icons.Default.Download) { exportLauncher.launch("DemoniTalk_Backup.json"); scope.launch { drawerState.close() } }
                         Spacer(modifier = Modifier.height(16.dp))
-                        DrawerButton(text = if (isEnglish) "Storage" else "Almacenamiento", icon = Icons.Default.Menu) { showStorageDialog = true; scope.launch { drawerState.close() } }
+                        DrawerButton(text = if (isEnglish) "Storage" else "Almacenamiento", icon = Icons.Default.Storage) { showStorageDialog = true; scope.launch { drawerState.close() } }
                         Spacer(modifier = Modifier.height(16.dp))
                         DrawerButton(text = if (isEnglish) "AI Config" else "Cerebro IA", icon = Icons.Default.Add, iconTint = com.example.demonitalk.ui.theme.DemoniPurple) { 
                             showAiDialog = true
                             scope.launch { drawerState.close() } 
                         }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        DrawerButton(text = if (isEnglish) "Help & Guide" else "Ayuda y Guía", icon = Icons.Default.HelpOutline, iconTint = com.example.demonitalk.ui.theme.BrimstoneYellow) { showHelpDialog = true; scope.launch { drawerState.close() } }
                         
                         Spacer(modifier = Modifier.weight(1f))
                         Column(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -320,8 +327,255 @@ class MainActivity : ComponentActivity() {
                 if (showSettingsDialog) SettingsDialog(onDismiss = { showSettingsDialog = false }, isEnglish = isEnglish)
                 if (showStorageDialog) StorageDialog(onDismiss = { showStorageDialog = false }, isEnglish = isEnglish, onCommandsUpdated = { commands = it })
                 if (showAiDialog) AiConfigDialog(onDismiss = { showAiDialog = false }, isEnglish = isEnglish)
+                if (showHelpDialog) HelpDialog(onDismiss = { showHelpDialog = false }, isEnglish = isEnglish)
             }
         }
+    }
+
+    @Composable
+    fun HelpDialog(onDismiss: () -> Unit, isEnglish: Boolean) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.HelpOutline,
+                        contentDescription = null,
+                        tint = com.example.demonitalk.ui.theme.HellRed,
+                        modifier = Modifier.size(26.dp)
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = if (isEnglish) "Guide & Operation" else "Guía y Funcionamiento",
+                        color = com.example.demonitalk.ui.theme.HellRed,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 18.sp
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 480.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    // FUNCIONAMIENTO GENERAL
+                    Text(
+                        text = if (isEnglish) "GENERAL OPERATION" else "FUNCIONAMIENTO GENERAL",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = if (isEnglish)
+                            "DemoniTalk allows you to control your Android device using voice commands and floating actions. Say 'Demoni' or 'Demonio' followed by your command or query."
+                        else
+                            "DemoniTalk te permite controlar tu dispositivo Android mediante voz y acciones flotantes. Di 'Demoni' o 'Demonio' seguido de tu orden o pregunta.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(0.9f)
+                    )
+
+                    Spacer(Modifier.height(12.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(0.1f))
+                    Spacer(Modifier.height(12.dp))
+
+                    // MODOS DE ACTIVACIÓN (BOTÓN FLOTANTE)
+                    Text(
+                        text = if (isEnglish) "ACTIVATION MODES (FLOATING BUTTON)" else "MODOS DE ACTIVACIÓN (BOTÓN FLOTANTE)",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(Modifier.height(8.dp))
+
+                    // Amarillo
+                    Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(bottom = 8.dp)) {
+                        Box(modifier = Modifier.padding(top = 4.dp).size(10.dp).background(Color(0xFFFFD600), CircleShape))
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = if (isEnglish) "Yellow Mode (Single Listen):" else "Modo Amarillo (Solo Escucha):",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFFFD600)
+                            )
+                            Text(
+                                text = if (isEnglish)
+                                    "Listens to a single command or query, executes it, and automatically goes back to silence/idle mode."
+                                else
+                                    "Escucha una única orden o pregunta, la ejecuta y pasa automáticamente a silencio/reposo tras responder.",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(0.85f)
+                            )
+                        }
+                    }
+
+                    // Azul
+                    Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(bottom = 8.dp)) {
+                        Box(modifier = Modifier.padding(top = 4.dp).size(10.dp).background(Color(0xFF2196F3), CircleShape))
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = if (isEnglish) "Blue Mode (Vigilance / Wake Word):" else "Modo Azul (Modo Vigilancia):",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF2196F3)
+                            )
+                            Text(
+                                text = if (isEnglish)
+                                    "Stays listening in background and only activates when it hears a trigger word ('Demoni', 'Demonio', 'Máquina', 'Hermano', etc.)."
+                                else
+                                    "Escucha en segundo plano y solo se activa cuando escucha una palabra clave de invocación ('Demoni', 'Demonio', 'Máquina', 'Hermano', etc.).",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(0.85f)
+                            )
+                        }
+                    }
+
+                    // Verde
+                    Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(bottom = 8.dp)) {
+                        Box(modifier = Modifier.padding(top = 4.dp).size(10.dp).background(Color(0xFF4CAF50), CircleShape))
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = if (isEnglish) "Green Mode (Continuous Listen):" else "Modo Verde (Escucha Continua):",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF4CAF50)
+                            )
+                            Text(
+                                text = if (isEnglish)
+                                    "Keeps microphone active continuously to process multiple commands sequentially without stopping."
+                                else
+                                    "Mantiene el micrófono abierto de forma continua para procesar múltiples órdenes o preguntas seguidas sin pausar.",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(0.85f)
+                            )
+                        }
+                    }
+
+                    // Rojo
+                    Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(bottom = 8.dp)) {
+                        Box(modifier = Modifier.padding(top = 4.dp).size(10.dp).background(Color(0xFFFF0600), CircleShape))
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = if (isEnglish) "Red Mode (Stop):" else "Modo Rojo (Detener):",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFFF0600)
+                            )
+                            Text(
+                                text = if (isEnglish)
+                                    "Immediately stops listening and turns off active voice services."
+                                else
+                                    "Detiene de inmediato la escucha activa y apaga los procesos de voz.",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(0.85f)
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(0.1f))
+                    Spacer(Modifier.height(12.dp))
+
+                    // MODOS DE EJECUCIÓN
+                    Text(
+                        text = if (isEnglish) "EXECUTION MODES" else "MODOS DE EJECUCIÓN",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(Modifier.height(6.dp))
+
+                    // Modo Demoniaco
+                    Text(
+                        text = if (isEnglish) "• Demonic Mode (Root + Accessibility):" else "• Modo Demoníaco (Root + Accesibilidad):",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = com.example.demonitalk.ui.theme.BrimstoneYellow
+                    )
+                    Text(
+                        text = if (isEnglish)
+                            "Hybrid mode (Default). Executes commands using Root shell for maximum speed. If Root fails or is not required, it automatically falls back to Accessibility."
+                        else
+                            "Modo híbrido (Por defecto). Intenta ejecutar acciones con permisos Root para máxima velocidad en segundo plano. Si falla o no requiere Root, usa Accesibilidad.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(0.85f),
+                        modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
+                    )
+
+                    // Modo Root
+                    Text(
+                        text = if (isEnglish) "• Root Mode:" else "• Modo Root:",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = com.example.demonitalk.ui.theme.HellRed
+                    )
+                    Text(
+                        text = if (isEnglish)
+                            "Executes commands exclusively via Root shell (input tap, keyevent, pm, am). Requires root access on the device."
+                        else
+                            "Ejecuta los comandos únicamente mediante shell con permisos Root (input tap, keyevent, pm, am). Requiere superusuario Root.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(0.85f),
+                        modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
+                    )
+
+                    // Modo Accesibilidad
+                    Text(
+                        text = if (isEnglish) "• Accessibility Mode:" else "• Modo Accesibilidad:",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = com.example.demonitalk.ui.theme.DemoniPurple
+                    )
+                    Text(
+                        text = if (isEnglish)
+                            "Executes actions by interacting with screen nodes through DemoniAccessibilityService (clicks, text input, navigation). Does not require Root."
+                        else
+                            "Ejecuta acciones interactuando con los elementos en pantalla mediante DemoniAccessibilityService (clics, escribir texto, scroll). No requiere Root.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(0.85f),
+                        modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
+                    )
+
+                    Spacer(Modifier.height(8.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(0.1f))
+                    Spacer(Modifier.height(8.dp))
+
+                    // CEREBRO IA
+                    Text(
+                        text = if (isEnglish) "AI BRAIN ENGINES" else "CEREBRO IA",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = if (isEnglish)
+                            "Gemini API provides official Google responses using your key. Free AI provides fast answers directly without needing an API key."
+                        else
+                            "Gemini API utiliza tu clave de Google para respuestas avanzadas. La IA Gratuita contesta de forma ultra rápida sin requerir ninguna clave.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(0.85f)
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = onDismiss) {
+                    Text(if (isEnglish) "UNDERSTOOD" else "ENTENDIDO", color = com.example.demonitalk.ui.theme.HellRed, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
     }
 
     @Composable
@@ -518,19 +772,163 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun StorageDialog(onDismiss: () -> Unit, isEnglish: Boolean, onCommandsUpdated: (List<VoiceCommand>) -> Unit) {
+        var currentCommands by remember { mutableStateOf(repository.loadCommands()) }
+        var showConfirmReset by remember { mutableStateOf(false) }
+
         AlertDialog(
             onDismissRequest = onDismiss,
             containerColor = MaterialTheme.colorScheme.surface,
-            title = { Text(if (isEnglish) "Storage" else "Almacenamiento", color = MaterialTheme.colorScheme.onSurface) },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Storage, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (isEnglish) "Storage & Commands" else "Almacenamiento de Comandos",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                }
+            },
             text = {
-                Column {
-                    Text("Limpiar caché de comandos y reiniciar base de datos.", color = MaterialTheme.colorScheme.onSurface)
-                    IconButton(onClick = { repository.clearCache(); onCommandsUpdated(repository.loadCommands()); onDismiss() }) {
-                        Icon(Icons.Default.DeleteForever, "Clear", tint = Color.Red)
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = if (isEnglish) "Total saved entries: ${currentCommands.size}" else "Total de entradas guardadas: ${currentCommands.size}",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    Spacer(Modifier.height(8.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(0.1f))
+                    Spacer(Modifier.height(8.dp))
+
+                    Text(
+                        text = if (isEnglish) "SAVED COMMANDS:" else "ENTRADAS REGISTRADAS:",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = if (repository.isDarkMode()) AshGrey else Color.DarkGray
+                    )
+
+                    Spacer(Modifier.height(6.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 200.dp)
+                            .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(0.15f), RoundedCornerShape(8.dp))
+                            .padding(4.dp)
+                    ) {
+                        if (currentCommands.isEmpty()) {
+                            Text(
+                                if (isEnglish) "No saved commands." else "No hay comandos guardados.",
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(12.dp),
+                                color = Color.Gray
+                            )
+                        } else {
+                            LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                                items(currentCommands) { cmd ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = cmd.trigger,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp,
+                                                color = if (cmd.isRoot) com.example.demonitalk.ui.theme.BrimstoneYellow else MaterialTheme.colorScheme.primary
+                                            )
+                                            Text(
+                                                text = cmd.action,
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurface.copy(0.7f),
+                                                maxLines = 1
+                                            )
+                                        }
+                                        if (cmd.isRoot) {
+                                            Text("ROOT", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = com.example.demonitalk.ui.theme.HellRed)
+                                        }
+                                    }
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(0.05f))
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(0.1f))
+                    Spacer(Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                if (isEnglish) "Reset database & cache" else "Restablecer base de datos",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = com.example.demonitalk.ui.theme.HellRed
+                            )
+                            Text(
+                                if (isEnglish) "Restores default commands" else "Restaura los comandos predeterminados",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(0.6f)
+                            )
+                        }
+                        IconButton(onClick = { showConfirmReset = true }) {
+                            Icon(
+                                Icons.Default.DeleteForever,
+                                contentDescription = "Clear",
+                                tint = com.example.demonitalk.ui.theme.HellRed
+                            )
+                        }
+                    }
+
+                    if (showConfirmReset) {
+                        Spacer(Modifier.height(8.dp))
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = com.example.demonitalk.ui.theme.HellRed.copy(0.1f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(8.dp)) {
+                                Text(
+                                    if (isEnglish) "Are you sure you want to reset commands?" else "¿Seguro que deseas restablecer los comandos a su estado original?",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = com.example.demonitalk.ui.theme.HellRed
+                                )
+                                Row(
+                                    horizontalArrangement = Arrangement.End,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    TextButton(onClick = { showConfirmReset = false }) {
+                                        Text(if (isEnglish) "Cancel" else "Cancelar", fontSize = 11.sp)
+                                    }
+                                    TextButton(onClick = {
+                                        repository.clearCache()
+                                        currentCommands = repository.loadCommands()
+                                        onCommandsUpdated(currentCommands)
+                                        showConfirmReset = false
+                                        Toast.makeText(this@MainActivity, if (isEnglish) "Commands reset!" else "¡Comandos restablecidos!", Toast.LENGTH_SHORT).show()
+                                    }) {
+                                        Text(if (isEnglish) "Reset" else "Restablecer", color = com.example.demonitalk.ui.theme.HellRed, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = onDismiss) { Text("CERRAR") } }
+            confirmButton = {
+                TextButton(onClick = onDismiss) {
+                    Text(if (isEnglish) "CLOSE" else "CERRAR", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                }
+            }
         )
     }
 
@@ -564,9 +962,9 @@ class MainActivity : ComponentActivity() {
                     Spacer(Modifier.height(8.dp))
 
                     val modes = listOf(
-                        "HYBRID" to "Demoni (Híbrido Root + Accesibilidad)",
-                        "ROOT" to "Solo Root Shell",
-                        "ACCESSIBILITY" to "Solo DemoniAccessibility"
+                        "HYBRID" to if (isEnglish) "Modo Demoníaco (Root + Accesibilidad)" else "Modo Demoníaco (Root + Accesibilidad)",
+                        "ROOT" to if (isEnglish) "Modo Root" else "Modo Root",
+                        "ACCESSIBILITY" to if (isEnglish) "Modo Accesibilidad" else "Modo Accesibilidad"
                     )
 
                     modes.forEach { (modeKey, modeLabel) ->

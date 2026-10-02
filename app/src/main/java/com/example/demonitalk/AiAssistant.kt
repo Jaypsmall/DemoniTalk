@@ -22,8 +22,15 @@ class AiAssistant(context: Context) {
         return repository.getGeminiApiKey().trim().isNotEmpty()
     }
 
+    fun isAiAvailable(): Boolean {
+        if (!isAiEnabled()) return false
+        val geminiReady = repository.isGeminiEngineEnabled() && hasApiKey()
+        val freeReady = repository.isFreeAiEngineEnabled()
+        return geminiReady || freeReady
+    }
+
     suspend fun askGemini(prompt: String): String? = withContext(Dispatchers.IO) {
-        if (!repository.isAiEnabled()) {
+        if (!isAiEnabled()) {
             Log.d("AiAssistant", "IA desactivada por la configuración del usuario.")
             return@withContext null
         }
@@ -32,6 +39,19 @@ class AiAssistant(context: Context) {
         val isFreeAllowed = repository.isFreeAiEngineEnabled()
 
         val apiKey = repository.getGeminiApiKey().trim()
+
+        // Si SOLO la IA Gratuita está activada (o Gemini no tiene API key ni está activo)
+        val useOnlyFree = isFreeAllowed && (!isGeminiAllowed || apiKey.isEmpty())
+
+        if (useOnlyFree) {
+            Log.d("AiAssistant", "Solo IA Gratuita activa: respondiendo directo sin tocar Gemini...")
+            val freeReply = askFreePublicAi(prompt)
+            if (!freeReply.isNullOrEmpty()) {
+                Log.d("AiAssistant", "Respuesta exitosa de IA Gratuita: $freeReply")
+                return@withContext freeReply
+            }
+            return@withContext null
+        }
 
         // 1. Si el motor Gemini API está activado y hay clave, lo intentamos
         if (isGeminiAllowed && apiKey.isNotEmpty()) {
@@ -60,9 +80,9 @@ class AiAssistant(context: Context) {
             }
         }
 
-        // 2. Si el motor IA Gratuita está activado, la usamos
+        // 2. Si Gemini falló pero la IA Gratuita está activada, se usa como respaldo
         if (isFreeAllowed) {
-            Log.d("AiAssistant", "Usando motor de IA gratuito sin clave...")
+            Log.d("AiAssistant", "Usando motor de IA gratuito como respaldo...")
             val freeReply = askFreePublicAi(prompt)
             if (!freeReply.isNullOrEmpty()) {
                 Log.d("AiAssistant", "Respuesta exitosa de IA Gratuita: $freeReply")
@@ -84,8 +104,8 @@ class AiAssistant(context: Context) {
             val url = URL(urlString)
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
-            connection.connectTimeout = 8000
-            connection.readTimeout = 8000
+            connection.connectTimeout = 4000
+            connection.readTimeout = 5000
 
             if (connection.responseCode == 200) {
                 val responseText = connection.inputStream.bufferedReader().use { it.readText() }.trim()

@@ -1361,7 +1361,8 @@ class FloatingButtonService : Service() {
     private fun processWithAiAndSpeak(prompt: String) {
         if (isServiceDestroyed) return
 
-        if (!aiAssistant.hasApiKey()) {
+        if (!aiAssistant.isAiAvailable()) {
+            Log.w("DemoniTalk", "IA no está disponible o no hay motores activos.")
             isWaitingForCommandAfterWake = false
             if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) {
                 scheduleListeningRestart(500)
