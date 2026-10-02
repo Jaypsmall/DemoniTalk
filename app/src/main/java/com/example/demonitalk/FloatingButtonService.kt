@@ -966,6 +966,9 @@ class FloatingButtonService : Service() {
                                         !isWaitingForCommandAfterWake
                             )
 
+                        val lowerText = text.lowercase(Locale.getDefault())
+                        val hasDemonTrigger = lowerText.contains("demoni") || lowerText.contains("demonio")
+
                         /*
                          * Modo amarillo:
                          * una frase reconocida = comando.
@@ -990,17 +993,25 @@ class FloatingButtonService : Service() {
 
                             return
                         } else if (
+                            hasDemonTrigger &&
                             result == CommandHandler.CommandResult.Ignored
                         ) {
 
-                            Log.d(
-                                "DemoniTalk",
-                                "Comando no local. Procesando con Inteligencia Artificial Gemini..."
-                            )
+                            val cleanPrompt = lowerText
+                                .replace(Regex("""\bdemoni\b"""), "")
+                                .replace(Regex("""\bdemonio\b"""), "")
+                                .trim()
 
-                            processWithAiAndSpeak(text)
+                            if (cleanPrompt.isNotEmpty()) {
+                                Log.d(
+                                    "DemoniTalk",
+                                    "Invocación a IA con 'demoni/demonio': $cleanPrompt"
+                                )
 
-                            return
+                                processWithAiAndSpeak(cleanPrompt)
+
+                                return
+                            }
                         }
 
                     } catch (e: Exception) {

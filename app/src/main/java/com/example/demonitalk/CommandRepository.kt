@@ -14,6 +14,33 @@ class CommandRepository(private val context: Context) {
     private val EXPORT_PATH_KEY = "export_path"
     private val GEMINI_API_KEY = "gemini_api_key"
     private val AI_ENABLED_KEY = "ai_enabled"
+    private val EXECUTION_MODE_KEY = "execution_mode"
+    private val GEMINI_ENGINE_ENABLED_KEY = "gemini_engine_enabled"
+    private val FREE_AI_ENGINE_ENABLED_KEY = "free_ai_engine_enabled"
+
+    fun saveExecutionMode(mode: String) {
+        prefs.edit { putString(EXECUTION_MODE_KEY, mode) }
+    }
+
+    fun getExecutionMode(): String {
+        return prefs.getString(EXECUTION_MODE_KEY, "HYBRID") ?: "HYBRID"
+    }
+
+    fun saveGeminiEngineEnabled(enabled: Boolean) {
+        prefs.edit { putBoolean(GEMINI_ENGINE_ENABLED_KEY, enabled) }
+    }
+
+    fun isGeminiEngineEnabled(): Boolean {
+        return prefs.getBoolean(GEMINI_ENGINE_ENABLED_KEY, true)
+    }
+
+    fun saveFreeAiEngineEnabled(enabled: Boolean) {
+        prefs.edit { putBoolean(FREE_AI_ENGINE_ENABLED_KEY, enabled) }
+    }
+
+    fun isFreeAiEngineEnabled(): Boolean {
+        return prefs.getBoolean(FREE_AI_ENGINE_ENABLED_KEY, true)
+    }
 
     fun saveAiEnabled(enabled: Boolean) {
         prefs.edit { putBoolean(AI_ENABLED_KEY, enabled) }
@@ -47,11 +74,15 @@ class CommandRepository(private val context: Context) {
         return prefs.getString(EXPORT_PATH_KEY, "") ?: ""
     }
 
+    private var cachedCommands: List<VoiceCommand>? = null
+
     fun saveCommands(commands: List<VoiceCommand>) {
+        cachedCommands = commands
         prefs.edit { putString(COMMANDS_KEY, gson.toJson(commands)) }
     }
 
     fun clearCache() {
+        cachedCommands = null
         prefs.edit { remove(COMMANDS_KEY) }
     }
 
@@ -66,6 +97,8 @@ class CommandRepository(private val context: Context) {
     }
 
     fun loadCommands(): List<VoiceCommand> {
+        cachedCommands?.let { return it }
+
         val json = prefs.getString(COMMANDS_KEY, null)
         val currentCommands = if (json == null) {
             getDefaultCommands()
@@ -91,7 +124,10 @@ class CommandRepository(private val context: Context) {
             }
         }
 
-        if (modified) saveCommands(uniqueCommands)
+        if (modified) {
+            prefs.edit { putString(COMMANDS_KEY, gson.toJson(uniqueCommands)) }
+        }
+        cachedCommands = uniqueCommands
         return uniqueCommands
     }
 

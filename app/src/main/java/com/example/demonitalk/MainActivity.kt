@@ -328,13 +328,15 @@ class MainActivity : ComponentActivity() {
     fun AiConfigDialog(onDismiss: () -> Unit, isEnglish: Boolean) {
         var key by remember { mutableStateOf(repository.getGeminiApiKey()) }
         var aiEnabled by remember { mutableStateOf(repository.isAiEnabled()) }
+        var geminiEnabled by remember { mutableStateOf(repository.isGeminiEngineEnabled()) }
+        var freeAiEnabled by remember { mutableStateOf(repository.isFreeAiEngineEnabled()) }
         var testing by remember { mutableStateOf(false) }
         var testResult by remember { mutableStateOf<String?>(null) }
         val scope = rememberCoroutineScope()
 
         AlertDialog(
             onDismissRequest = onDismiss,
-            containerColor = com.example.demonitalk.ui.theme.Obsidian,
+            containerColor = MaterialTheme.colorScheme.surface,
             title = { Text("CONFIGURACIÓN DE IA", color = com.example.demonitalk.ui.theme.DemoniPurple, fontWeight = FontWeight.Black) },
             text = {
                 Column {
@@ -344,7 +346,7 @@ class MainActivity : ComponentActivity() {
                     ) {
                         Text(
                             text = "Respuestas con IA",
-                            color = com.example.demonitalk.ui.theme.SoulWhite,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp,
                             modifier = Modifier.weight(1f)
@@ -354,26 +356,62 @@ class MainActivity : ComponentActivity() {
                             onCheckedChange = { 
                                 aiEnabled = it
                                 repository.saveAiEnabled(it)
-                                Toast.makeText(this@MainActivity, if (it) "IA Activada 😈" else "IA Desactivada 🔇", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(0.1f))
+                    Spacer(Modifier.height(8.dp))
+
+                    Text("MOTORES DE IA DISPONIBLES:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Gemini API (Oficial)", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                        androidx.compose.material3.Switch(
+                            checked = geminiEnabled,
+                            onCheckedChange = { 
+                                geminiEnabled = it
+                                repository.saveGeminiEngineEnabled(it)
+                            }
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("IA Gratuita (Pública)", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                        androidx.compose.material3.Switch(
+                            checked = freeAiEnabled,
+                            onCheckedChange = { 
+                                freeAiEnabled = it
+                                repository.saveFreeAiEngineEnabled(it)
                             }
                         )
                     }
 
                     Spacer(Modifier.height(12.dp))
-                    Text("Clave API Gemini (Opcional, si no se especifica usa el motor gratuito):", color = com.example.demonitalk.ui.theme.SoulWhite, fontSize = 12.sp)
-                    Spacer(Modifier.height(8.dp))
-                    TextField(
+                    Text("Clave API Gemini (Opcional):", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
+                    Spacer(Modifier.height(6.dp))
+                    androidx.compose.material3.OutlinedTextField(
                         value = key, 
                         onValueChange = { key = it; testResult = null }, 
                         label = { Text("API Key") },
-                        placeholder = { Text("Pega tu clave API aquí...") }
+                        placeholder = { Text("Pega tu clave API aquí...") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
                     )
                     if (testResult != null) {
                         Spacer(Modifier.height(8.dp))
                         Text(
                             text = testResult!!, 
                             fontSize = 11.sp, 
-                            color = if (testResult!!.startsWith("¡Conectado")) Color.Green else com.example.demonitalk.ui.theme.HellRed
+                            color = if (testResult!!.startsWith("¡Conectado")) Color(0xFF2E7D32) else com.example.demonitalk.ui.theme.HellRed
                         )
                     }
                 }
@@ -383,6 +421,9 @@ class MainActivity : ComponentActivity() {
                     enabled = !testing,
                     onClick = { 
                         repository.saveAiEnabled(aiEnabled)
+                        repository.saveGeminiEngineEnabled(geminiEnabled)
+                        repository.saveFreeAiEngineEnabled(freeAiEnabled)
+
                         if (key.trim().isNotEmpty()) {
                             testing = true
                             val cleanKey = key.trim()
@@ -444,16 +485,29 @@ class MainActivity : ComponentActivity() {
         var r by remember { mutableStateOf(commandToEdit?.isRoot ?: false) }
         AlertDialog(
             onDismissRequest = onDismiss,
-            containerColor = com.example.demonitalk.ui.theme.Obsidian,
+            containerColor = MaterialTheme.colorScheme.surface,
             title = { Text(if (commandToEdit == null) "NUEVO PACTO" else "EDITAR PACTO", color = com.example.demonitalk.ui.theme.HellRed, fontWeight = FontWeight.Black) },
             text = {
                 Column {
-                    TextField(value = t, onValueChange = { t = it }, label = { Text("Palabra Clave") })
+                    androidx.compose.material3.OutlinedTextField(
+                        value = t, 
+                        onValueChange = { t = it }, 
+                        label = { Text("Palabra Clave") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                     Spacer(Modifier.height(8.dp))
-                    TextField(value = a, onValueChange = { a = it }, label = { Text("Acción / Comando") })
+                    androidx.compose.material3.OutlinedTextField(
+                        value = a, 
+                        onValueChange = { a = it }, 
+                        label = { Text("Acción / Comando") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = r, onCheckedChange = { r = it })
-                        Text("Requiere Root 😈", color = com.example.demonitalk.ui.theme.BrimstoneYellow)
+                        Text("Requiere Root 😈", color = MaterialTheme.colorScheme.tertiary)
                     }
                 }
             },
@@ -466,10 +520,11 @@ class MainActivity : ComponentActivity() {
     fun StorageDialog(onDismiss: () -> Unit, isEnglish: Boolean, onCommandsUpdated: (List<VoiceCommand>) -> Unit) {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text(if (isEnglish) "Storage" else "Almacenamiento") },
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text(if (isEnglish) "Storage" else "Almacenamiento", color = MaterialTheme.colorScheme.onSurface) },
             text = {
                 Column {
-                    Text("Limpiar caché de comandos y reiniciar base de datos.")
+                    Text("Limpiar caché de comandos y reiniciar base de datos.", color = MaterialTheme.colorScheme.onSurface)
                     IconButton(onClick = { repository.clearCache(); onCommandsUpdated(repository.loadCommands()); onDismiss() }) {
                         Icon(Icons.Default.DeleteForever, "Clear", tint = Color.Red)
                     }
@@ -482,11 +537,66 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun SettingsDialog(onDismiss: () -> Unit, isEnglish: Boolean) {
         var p by remember { mutableStateOf(repository.getExportPath()) }
+        var currentMode by remember { mutableStateOf(repository.getExecutionMode()) }
+
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text(if (isEnglish) "Settings" else "Ajustes") },
-            text = { TextField(value = p, onValueChange = { p = it }, label = { Text("Ruta de Exportación") }) },
-            confirmButton = { TextButton(onClick = { repository.saveExportPath(p); onDismiss() }) { Text("GUARDAR") } }
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text(if (isEnglish) "Settings" else "Ajustes del Sistema", color = com.example.demonitalk.ui.theme.HellRed, fontWeight = FontWeight.Black) },
+            text = {
+                Column {
+                    Text("RUTA DE EXPORTACIÓN", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(6.dp))
+                    androidx.compose.material3.OutlinedTextField(
+                        value = p, 
+                        onValueChange = { p = it }, 
+                        label = { Text("Ruta de Respaldos") }, 
+                        placeholder = { Text("Ej. /sdcard/Download") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    Spacer(Modifier.height(16.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(0.1f))
+                    Spacer(Modifier.height(12.dp))
+
+                    Text("MODO DE EJECUCIÓN DE COMANDOS:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(8.dp))
+
+                    val modes = listOf(
+                        "HYBRID" to "Demoni (Híbrido Root + Accesibilidad)",
+                        "ROOT" to "Solo Root Shell",
+                        "ACCESSIBILITY" to "Solo DemoniAccessibility"
+                    )
+
+                    modes.forEach { (modeKey, modeLabel) ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            androidx.compose.material3.RadioButton(
+                                selected = (currentMode == modeKey),
+                                onClick = { currentMode = modeKey }
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = modeLabel,
+                                fontSize = 12.sp,
+                                color = if (currentMode == modeKey) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = { 
+                TextButton(onClick = { 
+                    repository.saveExportPath(p)
+                    repository.saveExecutionMode(currentMode)
+                    onDismiss()
+                    Toast.makeText(this@MainActivity, "Ajustes guardados correctamente 😈", Toast.LENGTH_SHORT).show()
+                }) { Text("GUARDAR", color = com.example.demonitalk.ui.theme.HellRed, fontWeight = FontWeight.Bold) } 
+            },
+            dismissButton = { TextButton(onClick = onDismiss) { Text("CANCELAR", color = AshGrey) } }
         )
     }
 

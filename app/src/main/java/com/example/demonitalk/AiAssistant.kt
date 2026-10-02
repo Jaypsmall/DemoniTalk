@@ -28,17 +28,18 @@ class AiAssistant(context: Context) {
             return@withContext null
         }
 
+        val isGeminiAllowed = repository.isGeminiEngineEnabled()
+        val isFreeAllowed = repository.isFreeAiEngineEnabled()
+
         val apiKey = repository.getGeminiApiKey().trim()
 
-        // 1. Si el usuario ingresó clave de Gemini, la probamos
-        if (apiKey.isNotEmpty()) {
-            val modelsToTry = listOf(
-                "gemini-3.8-flash"
-            )
+        // 1. Si el motor Gemini API está activado y hay clave, lo intentamos
+        if (isGeminiAllowed && apiKey.isNotEmpty()) {
+            val modelsToTry = listOf("gemini-3.8-flash")
 
             for (modelName in modelsToTry) {
                 try {
-                    Log.d("AiAssistant", "Intentando con modelo: $modelName")
+                    Log.d("AiAssistant", "Intentando con modelo Gemini: $modelName")
                     val model = GenerativeModel(
                         modelName = modelName,
                         apiKey = apiKey,
@@ -50,24 +51,26 @@ class AiAssistant(context: Context) {
                     val response = model.generateContent(prompt)
                     val reply = response.text?.trim()
                     if (!reply.isNullOrEmpty()) {
-                        Log.d("AiAssistant", "Respuesta exitosa de $modelName: $reply")
+                        Log.d("AiAssistant", "Respuesta exitosa de Gemini ($modelName): $reply")
                         return@withContext reply
                     }
                 } catch (e: Exception) {
-                    Log.w("AiAssistant", "Fallo modelo $modelName: ${e.message}")
+                    Log.w("AiAssistant", "Fallo modelo Gemini $modelName: ${e.message}")
                 }
             }
         }
 
-        // 2. FALLBACK 100% GRATUITO SIN CLAVE (IA Pública)
-        Log.d("AiAssistant", "Usando motor de IA gratuito sin clave...")
-        val freeReply = askFreePublicAi(prompt)
-        if (!freeReply.isNullOrEmpty()) {
-            Log.d("AiAssistant", "Respuesta exitosa de IA Gratuita: $freeReply")
-            return@withContext freeReply
+        // 2. Si el motor IA Gratuita está activado, la usamos
+        if (isFreeAllowed) {
+            Log.d("AiAssistant", "Usando motor de IA gratuito sin clave...")
+            val freeReply = askFreePublicAi(prompt)
+            if (!freeReply.isNullOrEmpty()) {
+                Log.d("AiAssistant", "Respuesta exitosa de IA Gratuita: $freeReply")
+                return@withContext freeReply
+            }
         }
 
-        Log.e("AiAssistant", "No se pudo obtener respuesta de ningún motor de IA")
+        Log.e("AiAssistant", "No se pudo obtener respuesta (o ningún motor de IA activo)")
         null
     }
 

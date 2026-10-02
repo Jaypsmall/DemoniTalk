@@ -935,113 +935,57 @@ class DemoniAccessibilityService : AccessibilityService() {
         numberedNodes.clear()
         numberedBounds.clear()
 
-        val root =
-            rootInActiveWindow
-                ?: return
+        val root = rootInActiveWindow ?: return
 
-        val candidates =
-            mutableListOf<AccessibilityNodeInfo>()
+        val candidates = mutableListOf<AccessibilityNodeInfo>()
+        collectClickableNodes(root, candidates)
 
-        collectClickableNodes(
-            root,
-            candidates
-        )
+        val valid = candidates.filter { node ->
+            if (!node.isVisibleToUser) return@filter false
+            val rect = Rect()
+            node.getBoundsInScreen(rect)
+            rect.width() > 10 && rect.height() > 10
+        }
 
-        /*
-         * Eliminamos elementos que no tengan una posición
-         * válida o que no sean visibles.
-         */
-
-        val valid =
-            candidates.filter { node ->
-
-                if (!node.isVisibleToUser) {
-                    return@filter false
-                }
-
-                val rect =
-                    Rect()
-
-                node.getBoundsInScreen(rect)
-
-                rect.width() > 0 &&
-                        rect.height() > 0
+        val sorted = valid.sortedWith(
+            compareBy<AccessibilityNodeInfo> {
+                val rect = Rect()
+                it.getBoundsInScreen(rect)
+                rect.top
+            }.thenBy {
+                val rect = Rect()
+                it.getBoundsInScreen(rect)
+                rect.left
             }
-
-        /*
-         * Orden aproximado:
-         *
-         * arriba -> abajo
-         * izquierda -> derecha
-         */
-
-        val sorted =
-            valid.sortedWith(
-                compareBy<AccessibilityNodeInfo> {
-
-                    val rect =
-                        Rect()
-
-                    it.getBoundsInScreen(rect)
-
-                    rect.top
-
-                }.thenBy {
-
-                    val rect =
-                        Rect()
-
-                    it.getBoundsInScreen(rect)
-
-                    rect.left
-                }
-            )
+        )
 
         var number = 1
 
         for (node in sorted) {
-
-            /*
-             * Evitar asignar varios números a nodos
-             * que representan exactamente el mismo elemento.
-             */
-
-            val rect =
-                Rect()
-
+            val rect = Rect()
             node.getBoundsInScreen(rect)
 
-            val duplicate =
-                numberedBounds.values.any {
-                    it == rect
-                }
-
-            if (duplicate) {
-                continue
+            // Deduplicación para evitar superposición de etiquetas (overlap > 70%)
+            val duplicate = numberedBounds.values.any { existing ->
+                val overlapX = Math.max(0, Math.min(rect.right, existing.right) - Math.max(rect.left, existing.left))
+                val overlapY = Math.max(0, Math.min(rect.bottom, existing.bottom) - Math.max(rect.top, existing.top))
+                val overlapArea = overlapX * overlapY
+                val area1 = rect.width() * rect.height()
+                val area2 = existing.width() * existing.height()
+                val minArea = Math.min(area1, area2)
+                minArea > 0 && (overlapArea.toFloat() / minArea.toFloat()) > 0.7f
             }
 
-            numberedNodes[number] =
-                node
+            if (duplicate) continue
 
-            numberedBounds[number] =
-                Rect(rect)
+            numberedNodes[number] = node
+            numberedBounds[number] = Rect(rect)
 
             number++
-
-            /*
-             * Límite de seguridad para no crear cientos
-             * de etiquetas en interfaces enormes.
-             */
-
-            if (number > 99) {
-                break
-            }
+            if (number > 99) break
         }
 
-        Log.d(
-            TAG,
-            "Elementos numerados: ${numberedNodes.size}"
-        )
+        Log.d(TAG, "Elementos numerados: ${numberedNodes.size}")
     }
 
     // =========================================================
@@ -1338,102 +1282,49 @@ class DemoniAccessibilityService : AccessibilityService() {
 
     private fun drawNumbers() {
 
-        val overlay =
-            numbersOverlay
-                ?: return
-
+        val overlay = numbersOverlay ?: return
         overlay.removeAllViews()
 
-        val density =
-            resources.displayMetrics.density
+        val density = resources.displayMetrics.density
 
         for ((number, bounds) in numberedBounds) {
 
-            val label =
-                TextView(this)
+            val label = TextView(this).apply {
+                text = number.toString()
+                setTextColor(Color.WHITE)
+                setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11f)
+                setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+                gravity = Gravity.CENTER
+                setPadding((3 * density).toInt(), 0, (3 * density).toInt(), 0)
 
-            label.text =
-                number.toString()
+                // Etiqueta rediseñada: suave, redondeada y disimulada con fino borde rojo
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                    cornerRadius = 10f * density
+                    setColor(Color.argb(215, 18, 18, 22))
+                    setStroke((1.5f * density).toInt(), Color.argb(240, 255, 6, 0))
+                }
+            }
 
-            label.setTextColor(
-                Color.WHITE
-            )
+            val badgeHeight = (22f * density).toInt()
+            val badgeWidth = if (number > 9) (26f * density).toInt() else (22f * density).toInt()
 
-            label.setTextSize(
-                android.util.TypedValue.COMPLEX_UNIT_SP,
-                14f
-            )
+            val params = FrameLayout.LayoutParams(
+                badgeWidth,
+                badgeHeight
+            ).apply {
+                // Posicionar sutilmente en la esquina superior izquierda del elemento
+                leftMargin = bounds.left + (2 * density).toInt()
+                topMargin = bounds.top + (2 * density).toInt()
 
-            label.setTypeface(
-                Typeface.DEFAULT,
-                Typeface.BOLD
-            )
+                val maxX = resources.displayMetrics.widthPixels - badgeWidth
+                val maxY = resources.displayMetrics.heightPixels - badgeHeight
 
-            label.gravity =
-                Gravity.CENTER
+                leftMargin = leftMargin.coerceIn(0, maxX.coerceAtLeast(0))
+                topMargin = topMargin.coerceIn(0, maxY.coerceAtLeast(0))
+            }
 
-            label.setBackgroundColor(
-                Color.argb(
-                    220,
-                    0,
-                    0,
-                    0
-                )
-            )
-
-            /*
-             * Tamaño de la etiqueta.
-             */
-
-            val size =
-                (32f * density).toInt()
-
-            val params =
-                FrameLayout.LayoutParams(
-                    size,
-                    size
-                )
-
-            /*
-             * Centrar el número aproximadamente
-             * sobre el elemento.
-             */
-
-            params.leftMargin =
-                bounds.centerX() - size / 2
-
-            params.topMargin =
-                bounds.centerY() - size / 2
-
-            /*
-             * Evitar que la etiqueta se salga por
-             * los bordes de la pantalla.
-             */
-
-            val maxX =
-                resources.displayMetrics.widthPixels -
-                        size
-
-            val maxY =
-                resources.displayMetrics.heightPixels -
-                        size
-
-            params.leftMargin =
-                params.leftMargin.coerceIn(
-                    0,
-                    maxX.coerceAtLeast(0)
-                )
-
-            params.topMargin =
-                params.topMargin.coerceIn(
-                    0,
-                    maxY.coerceAtLeast(0)
-                )
-
-            overlay.addView(
-                label,
-                params
-            )
+            overlay.addView(label, params)
         }
     }
 

@@ -6,7 +6,7 @@ import java.text.Normalizer
 import java.util.Locale
 import java.util.regex.Pattern
 
-class CommandHandler(context: Context) {
+class CommandHandler(private val context: Context) {
 
     private var internalListener: ((String) -> Unit)? = null
 
@@ -536,76 +536,42 @@ class CommandHandler(context: Context) {
         }
 
         // ---------------------------------------------------------
-        // ROOT
+        // MODO DE EJECUCIÓN (HYBRID / ROOT / ACCESSIBILITY)
         // ---------------------------------------------------------
+        val repository = CommandRepository(context)
+        val mode = repository.getExecutionMode()
+
+        val allowRoot = (mode == "HYBRID" || mode == "ROOT")
+        val allowAccessibility = (mode == "HYBRID" || mode == "ACCESSIBILITY")
 
         var shellSuccess = false
 
-        if (ShellUtils.isRootAvailable()) {
-
+        if (allowRoot && ShellUtils.isRootAvailable()) {
             shellSuccess = try {
-
                 when {
-
-                    cleanAction == "global_back" -> {
-                        ShellUtils.executeCommand("input keyevent 4")
-                    }
-
-                    cleanAction == "global_home" -> {
-                        ShellUtils.executeCommand("input keyevent 3")
-                    }
-
-                    cleanAction == "global_recents" -> {
-                        ShellUtils.executeCommand("input keyevent 187")
-                    }
-
+                    cleanAction == "global_back" -> ShellUtils.executeCommand("input keyevent 4")
+                    cleanAction == "global_home" -> ShellUtils.executeCommand("input keyevent 3")
+                    cleanAction == "global_recents" -> ShellUtils.executeCommand("input keyevent 187")
                     cleanAction.startsWith("type:") -> {
                         val textToType = cleanAction.removePrefix("type:")
-                        val escapedText = textToType
-                            .replace("\\", "\\\\")
-                            .replace("\"", "\\\"")
-                            .replace(" ", "%s")
-
+                        val escapedText = textToType.replace("\\", "\\\\").replace("\"", "\\\"").replace(" ", "%s")
                         ShellUtils.executeCommand("input text \"$escapedText\"")
                     }
-
-                    cleanAction.startsWith("open_app:") || cleanAction.startsWith("click_") || cleanAction == "show_grid" || cleanAction == "show_numbers" || cleanAction == "hide_overlays" || cleanAction == "click_send" -> {
-                        false
-                    }
-
-                    else -> {
-                        ShellUtils.executeCommand(cleanAction)
-                    }
+                    cleanAction.startsWith("open_app:") || cleanAction.startsWith("click_") || cleanAction == "show_grid" || cleanAction == "show_numbers" || cleanAction == "hide_overlays" || cleanAction == "click_send" -> false
+                    else -> ShellUtils.executeCommand(cleanAction)
                 }
-
             } catch (e: Exception) {
                 Log.e("CommandHandler", "Error ejecutando Root: $cleanAction", e)
                 false
             }
         }
 
-        // ---------------------------------------------------------
-        // FALLBACK ACCESSIBILITY
-        // ---------------------------------------------------------
-
-        if (!shellSuccess) {
-
-            Log.d(
-                "CommandHandler",
-                "Root no ejecutó '$cleanAction'. Usando AccessibilityService."
-            )
-
+        if (!shellSuccess && allowAccessibility) {
+            Log.d("CommandHandler", "Ejecutando con AccessibilityService: '$cleanAction'")
             try {
-
                 accessibilityController.execute(cleanAction)
-
             } catch (e: Exception) {
-
-                Log.e(
-                    "CommandHandler",
-                    "Error ejecutando AccessibilityService: $cleanAction",
-                    e
-                )
+                Log.e("CommandHandler", "Error ejecutando AccessibilityService: $cleanAction", e)
             }
         }
     }
