@@ -1,18 +1,15 @@
+
 # 😈 DemoniTalk (v2.0.1 - DemonicAI Edition)   ![Android](https://img.shields.io/badge/Android-181717?style=flat&logo=android&logoColor=yellow) ![Kotlin](https://img.shields.io/badge/kotlin-181717?style=flat&logo=kotlin&logoColor=yellow) 
 
-# 😈 DemoniTalk — AI, Root & Accessibility Voice Automation Engine
+## 😈 DemoniTalk — AI, Root & Accessibility Voice Automation Engine    
+<a href="https://github.com/Jaypsmall/DemoniTalk/releases/download/demoni/DemoniTalk_v2.0.1_AI.apk">
+   <img src="https://img.shields.io/badge/DOWNLOAD_v2.0.1_AI_APK-181717?style=flat&logo=android&logoColor=yellow" alt="Download AI Release">
+<a href="https://github.com/Jaypsmall/DemoniTalk/releases/download/root/DemoniTalk_v1.0.3.apk">
+   <img src="https://img.shields.io/badge/DOWNLOAD_v1.0.3_APK-181717?style=flat&logo=android&logoColor=yellow" alt="Download Root Release">
+ </a>
 
 > [!NOTE]
 > **DemoniTalk** es un asistente de voz de vanguardia y un motor de automatización multinivel para Android. Combina la potencia del acceso a superusuario (Root), el motor de **Servicios de Accesibilidad (AccessibilityService API)** e integración con **IA / LLM local** para ejecutar scripts de consola, macros táctiles complejas e interacciones del sistema mediante voz e interfaz flotante.
-
-<p align="center">
-  <a href="https://github.com/Jaypsmall/DemoniTalk/releases/download/demoni/DemoniTalk_v2.0.1_AI.apk">
-    <img src="https://img.shields.io/badge/DOWNLOAD_v2.0.1_AI_APK-007ACC?style=for-the-badge&logo=android&logoColor=white" alt="Download AI Release">
-  </a>
-  <a href="https://github.com/Jaypsmall/DemoniTalk/releases/download/root/DemoniTalk_v1.0.3.apk">
-    <img src="https://img.shields.io/badge/DOWNLOAD_v1.0.3_ROOT_APK-005999?style=for-the-badge&logo=android&logoColor=white" alt="Download Root Release">
-  </a>
-</p>
 
 ---
 
@@ -26,15 +23,20 @@
 ## ✨ Key Features
 
 * **🤖 AI-Powered Assistant & Voice NLP:** Integración de Inteligencia Artificial para el procesamiento contextual de comandos de voz, interpretación natural del lenguaje y ejecución adaptativa de acciones.
+
 * **♿ Accessibility Service Automation:** Utiliza la API de `AccessibilityService` de Android para leer nodos de interfaz en pantalla, interactuar con elementos sin necesidad de coordenadas fijas y automatizar flujos dentro de cualquier aplicación.
+
 * **🎙️ Interactive Floating Overlay:** Módulo de escucha interactivo mediante un botón flotante siempre visible sobre cualquier app o juego.
+
 * **⚡ Root-Powered Execution (Custom Triggers):**
   * **Process Control:** Cierre forzado inmediato de aplicaciones (`am force-stop`) o finalización de procesos por PID.
   * **Touch & Gesture Simulation:** Creación de macros complejas encadenando coordenadas de toque (`input tap`), gestos (`input swipe`) y temporizadores (`sleep`).
   * **System Keyevent Injection:** Inyección de acciones nativas del sistema (Atrás, Inicio, Apps Recientes) mediante comandos de terminal de bajo nivel.
+
 * **🔄 Dynamic Capture Modes:**
   * **Continuous Mode:** Escucha activa continua para el procesamiento encadenado de intenciones y comandos de voz.
   * **Push-to-Talk (Manual):** Activación por toque para optimizar consumo de batería y memoria.
+
 * **🎨 "Demonic Edition" Interface:** Diseño oscuro agresivo y optimizado, con gestor de diccionarios (Importación/Exportación de perfiles) y soporte para temas.
 
 ---
