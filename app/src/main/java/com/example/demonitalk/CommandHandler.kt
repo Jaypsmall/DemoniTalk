@@ -117,10 +117,10 @@ class CommandHandler(private val context: Context) {
         // ---------------------------------------------------------
         // DETECCIÓN MULTI-COMANDO / SECUENCIAS DE ACCIONES
         // Detectamos conectores como *, ;, ,, &&, "luego", "después", "entonces",
-        // o "y" seguido de verbo/comando.
+        // o "y (el/la/los/las/un/una)" seguido de verbo/comando.
         // ---------------------------------------------------------
         val sequenceRegex = Regex(
-            """\s*[*;,]\s*(?=abre|abrir|pulsa|clic|click|escribe|manda|enviar|pon|reproduce|vuelve|atras|inicio|casa|recientes|buscar|busca|primer|primera|cerrar|activar|desactivar|activa|modo|silencio|detente|cuadricula|numeros|oculta|\*)|\s+(?:luego|después|despues|entonces)\s+|\s+y\s+(?=abre|abrir|pulsa|clic|click|escribe|manda|enviar|pon|reproduce|vuelve|atras|inicio|casa|recientes|buscar|busca|primer|primera|cerrar|activar|desactivar|activa|modo|silencio|detente|cuadricula|numeros|oculta)"""
+            """\s*[*;,]\s*|\s+(?:luego|después|despues|entonces)\s+|\s+y\s+(?:el\s+|la\s+|los\s+|las\s+|un\s+|una\s+)?(?=abre|abrir|abreme|pulsa|clic|click|escribe|manda|enviar|pon|reproduce|vuelve|atras|inicio|casa|recientes|buscar|busca|primer|primera|chat|cerrar|activar|desactivar|activa|modo|silencio|detente|cuadricula|numeros|oculta|foco|camara|\*)"""
         )
 
         val parts = normalizedText
@@ -157,6 +157,32 @@ class CommandHandler(private val context: Context) {
         Log.d("CommandHandler", "Ejecutando comando individual: '$normalizedText'")
 
         // ---------------------------------------------------------
+        // CHATS Y MENSAJES EN APPS (ej: "abre el primer chat de whatsapp", "primer chat")
+        // ---------------------------------------------------------
+        val isFirstChatPhrase = normalizedText.contains("primer chat") ||
+                normalizedText.contains("primera conversacion") ||
+                normalizedText.contains("primer contacto") ||
+                normalizedText.contains("primer mensaje") ||
+                normalizedText.contains("primera charla")
+
+        if (isFirstChatPhrase) {
+            val mentionsWhatsapp = normalizedText.contains("whatsapp") ||
+                    normalizedText.contains("wasap") ||
+                    normalizedText.contains("wasat") ||
+                    normalizedText.contains("guatsap")
+
+            if (mentionsWhatsapp) {
+                Log.d("CommandHandler", "Detectado abre WhatsApp + primer chat: '$normalizedText'")
+                executeSequence(listOf("open_app:whatsapp", "click_first_chat"), commands)
+                return true
+            } else {
+                Log.d("CommandHandler", "Detectado primer chat directo: '$normalizedText'")
+                executeAsync("click_first_chat")
+                return true
+            }
+        }
+
+        // ---------------------------------------------------------
         // ESCRIBIR / MENSAJES
         // Ejemplos:
         // "escribe hola hermano"
@@ -184,15 +210,36 @@ class CommandHandler(private val context: Context) {
             normalizedText == "manda este mensaje" -> return false
         }
 
+        // Helper para limpiar conectores al extraer nombre de app
+        fun extractCleanAppName(text: String): String {
+            var name = text.trim()
+            val connectors = listOf(" para ", " de ", " en ", " y ")
+            for (conn in connectors) {
+                if (name.contains(conn)) {
+                    name = name.substringBefore(conn).trim()
+                }
+            }
+            return name
+        }
+
         // ---------------------------------------------------------
         // ABRIR APLICACIÓN
         // Ejemplos:
         // "abre WhatsApp"
+        // "abreme whatsapp"
         // "abrir youtube"
         // ---------------------------------------------------------
         when {
             normalizedText.startsWith("abre ") -> {
-                val appName = normalizedText.removePrefix("abre ").trim()
+                val appName = extractCleanAppName(normalizedText.removePrefix("abre "))
+                if (appName.isNotEmpty()) {
+                    executeAsync("open_app:$appName")
+                    return true
+                }
+            }
+
+            normalizedText.startsWith("abreme ") -> {
+                val appName = extractCleanAppName(normalizedText.removePrefix("abreme "))
                 if (appName.isNotEmpty()) {
                     executeAsync("open_app:$appName")
                     return true
@@ -200,7 +247,15 @@ class CommandHandler(private val context: Context) {
             }
 
             normalizedText.startsWith("abrir ") -> {
-                val appName = normalizedText.removePrefix("abrir ").trim()
+                val appName = extractCleanAppName(normalizedText.removePrefix("abrir "))
+                if (appName.isNotEmpty()) {
+                    executeAsync("open_app:$appName")
+                    return true
+                }
+            }
+
+            normalizedText.startsWith("abrirme ") -> {
+                val appName = extractCleanAppName(normalizedText.removePrefix("abrirme "))
                 if (appName.isNotEmpty()) {
                     executeAsync("open_app:$appName")
                     return true
@@ -258,7 +313,11 @@ class CommandHandler(private val context: Context) {
 
             "numeros",
             "muestra numeros",
-            "mostrar numeros" -> {
+            "mostrar numeros",
+            "actualizar",
+            "actualizar numeros",
+            "refrescar",
+            "refrescar numeros" -> {
                 executeAsync("show_numbers")
                 return true
             }
@@ -442,21 +501,16 @@ class CommandHandler(private val context: Context) {
         text: String,
         trigger: String
     ): Boolean {
-
         if (text.length < 4 || trigger.length < 4) {
             return false
         }
+        // Si el texto completo es mucho más largo que el disparador, no es una coincidencia directa
+        if (Math.abs(text.length - trigger.length) > 5) {
+            return false
+        }
 
-        val prefixLength =
-            (trigger.length * 0.7)
-                .toInt()
-                .coerceAtLeast(1)
-
-        val prefix = trigger.substring(
-            0,
-            prefixLength.coerceAtMost(trigger.length)
-        )
-
+        val prefixLength = (trigger.length * 0.7).toInt().coerceAtLeast(1)
+        val prefix = trigger.substring(0, prefixLength.coerceAtMost(trigger.length))
         return text.contains(prefix)
     }
 

@@ -55,7 +55,25 @@ class AiAssistant(context: Context) {
 
         // 1. Si el motor Gemini API está activado y hay clave, lo intentamos
         if (isGeminiAllowed && apiKey.isNotEmpty()) {
-            val modelsToTry = listOf("gemini-3.8-flash")
+            val modelsToTry = listOf("gemini-2.0-flash", "gemini-1.5-flash", "gemini-3.8-flash")
+            val systemInstructionText = """
+                Eres Demoni, un asistente inteligente de voz en español para Android, directo y resolutivo. Responde en máximo 2 frases cortas.
+                REGLA CRÍTICA: NO incluyas NINGÚN emoji ni emoticono (como 🚀, 😈, etc.) porque la voz los lee en voz alta.
+
+                CAPACIDAD DE EJECUCIÓN:
+                Si el usuario pide realizar una acción o controlar el teléfono (de forma directa o coloquial), DEBES incluir la etiqueta '[CMD:acciones]' en tu respuesta.
+                Puedes encadenar múltiples acciones separadas por punto y coma (;) para secuencias completas.
+
+                COMANDOS DISPONIBLES:
+                - Abrir apps: open_app:nombre_app (ej: open_app:whatsapp, open_app:instagram) o paquete (ej: com.whatsapp, com.android.camera).
+                - Chats y Mensajes: click_first_chat (abre primer chat), type:texto (escribe el texto), click_send (envía el mensaje).
+                - Navegación: global_back, global_home, global_recents.
+                - Pulsar elementos: click_text:texto, click_number:numero.
+                - Linterna: torch_on, torch_off.
+                - Música/Web: play_music:cancion, search_web:consulta.
+
+                EJEMPLO: "Ábreme el primer chat de whatsapp y dile Hola" -> "[CMD:com.whatsapp; click_first_chat; type:Hola; click_send] Claro, enviando mensaje en WhatsApp."
+            """.trimIndent()
 
             for (modelName in modelsToTry) {
                 try {
@@ -64,7 +82,7 @@ class AiAssistant(context: Context) {
                         modelName = modelName,
                         apiKey = apiKey,
                         systemInstruction = content {
-                            text("Eres Demoni, un asistente inteligente de voz en español, directo, ingenioso y servicial. Responde en un máximo de 2 frases cortas para lectura fluida por sintetizador de voz.")
+                            text(systemInstructionText)
                         }
                     )
 
@@ -96,7 +114,7 @@ class AiAssistant(context: Context) {
 
     private fun askFreePublicAi(prompt: String): String? {
         return try {
-            val systemPrompt = "Eres Demoni, un asistente inteligente de voz en español, directo e ingenioso. Responde de forma muy corta en máximo 2 frases para voz."
+            val systemPrompt = "Eres Demoni, asistente de voz en español. Responde en máximo 2 frases. REGLA: SIN EMOJIS (se leen en voz alta). Si piden acciones/apps coloquiales, usa [CMD:acciones] (ej: [CMD:com.whatsapp; click_first_chat; type:texto; click_send] o [CMD:open_app:instagram] o [CMD:torch_on])."
             val encodedPrompt = URLEncoder.encode(prompt, "UTF-8")
             val encodedSystem = URLEncoder.encode(systemPrompt, "UTF-8")
 

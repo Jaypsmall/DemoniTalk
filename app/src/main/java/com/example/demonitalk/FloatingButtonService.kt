@@ -640,65 +640,38 @@ class FloatingButtonService : Service() {
     }
 
     private fun muteAudio(mute: Boolean) {
-
         try {
-
-            if (mute) {
-
-                if (originalSystemVolume == -1) {
-
-                    originalSystemVolume =
-                        audioManager.getStreamVolume(
-                            AudioManager.STREAM_SYSTEM
-                        )
-                }
-
-                audioManager.setStreamVolume(
-                    AudioManager.STREAM_SYSTEM,
-                    0,
-                    0
-                )
-
-            } else {
-
-                if (originalSystemVolume != -1) {
-
-                    val volumeToRestore =
-                        originalSystemVolume
-
-                    originalSystemVolume = -1
-
-                    mainHandler.postDelayed({
-
-                        if (!isServiceDestroyed) {
-
-                            try {
-
-                                audioManager.setStreamVolume(
-                                    AudioManager.STREAM_SYSTEM,
-                                    volumeToRestore,
-                                    0
-                                )
-
-                            } catch (e: Exception) {
-
-                                Log.e(
-                                    "DemoniTalk",
-                                    "Error restaurando volumen: ${e.message}"
-                                )
-                            }
-                        }
-
-                    }, 600)
+            val notificationManager = getSystemService(NOTIFICATION_SERVICE) as? android.app.NotificationManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (notificationManager != null && !notificationManager.isNotificationPolicyAccessGranted) {
+                    return
                 }
             }
 
+            if (mute) {
+                if (originalSystemVolume == -1) {
+                    originalSystemVolume = audioManager.getStreamVolume(AudioManager.STREAM_SYSTEM)
+                }
+                audioManager.setStreamVolume(AudioManager.STREAM_SYSTEM, 0, 0)
+            } else {
+                if (originalSystemVolume != -1) {
+                    val volumeToRestore = originalSystemVolume
+                    originalSystemVolume = -1
+                    mainHandler.postDelayed({
+                        if (!isServiceDestroyed) {
+                            try {
+                                audioManager.setStreamVolume(AudioManager.STREAM_SYSTEM, volumeToRestore, 0)
+                            } catch (e: Exception) {
+                                Log.d("DemoniTalk", "No se pudo restaurar volumen: ${e.message}")
+                            }
+                        }
+                    }, 600)
+                }
+            }
+        } catch (e: SecurityException) {
+            Log.d("DemoniTalk", "Permiso de política de notificaciones no otorgado para cambiar volumen DND: ${e.message}")
         } catch (e: Exception) {
-
-            Log.e(
-                "DemoniTalk",
-                "Error gestionando audio: ${e.message}"
-            )
+            Log.d("DemoniTalk", "Error gestionando audio: ${e.message}")
         }
     }
 
@@ -967,7 +940,6 @@ class FloatingButtonService : Service() {
                             )
 
                         val lowerText = text.lowercase(Locale.getDefault())
-                        val hasDemonTrigger = lowerText.contains("demoni") || lowerText.contains("demonio")
 
                         /*
                          * Modo amarillo:
@@ -993,7 +965,6 @@ class FloatingButtonService : Service() {
 
                             return
                         } else if (
-                            hasDemonTrigger &&
                             result == CommandHandler.CommandResult.Ignored
                         ) {
 
@@ -1002,13 +973,15 @@ class FloatingButtonService : Service() {
                                 .replace(Regex("""\bdemonio\b"""), "")
                                 .trim()
 
-                            if (cleanPrompt.isNotEmpty()) {
+                            val promptToSend = if (cleanPrompt.isNotEmpty()) cleanPrompt else lowerText
+
+                            if (promptToSend.isNotEmpty() && aiAssistant.isAiAvailable()) {
                                 Log.d(
                                     "DemoniTalk",
-                                    "Invocación a IA con 'demoni/demonio': $cleanPrompt"
+                                    "Comando no reconocido localmente. Procesando con IA: $promptToSend"
                                 )
 
-                                processWithAiAndSpeak(cleanPrompt)
+                                processWithAiAndSpeak(promptToSend)
 
                                 return
                             }
@@ -1358,6 +1331,13 @@ class FloatingButtonService : Service() {
         }
     }
 
+    private fun removeEmojis(text: String): String {
+        return text
+            .replace(Regex("""[\uD83C-\uDBFF\uDC00-\uDFFF\u2600-\u27BF\u1F300-\u1F9FF]"""), "")
+            .replace(Regex("""[🚀😈🤖⚡🔥✨👍]"""), "")
+            .trim()
+    }
+
     private fun processWithAiAndSpeak(prompt: String) {
         if (isServiceDestroyed) return
 
@@ -1375,16 +1355,48 @@ class FloatingButtonService : Service() {
         CoroutineScope(Dispatchers.Main).launch {
             val aiReply = aiAssistant.askGemini(prompt)
             if (!aiReply.isNullOrEmpty()) {
-                speakText(aiReply) {
-                    isWaitingForCommandAfterWake = false
-                    if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) {
-                        startListening()
+                val cleanReply = removeEmojis(aiReply)
+
+                // Verificamos si la IA incluyó una orden/accion interpretada [CMD:accion]
+                val cmdRegex = Regex("""\[CMD:(.+?)]""", RegexOption.IGNORE_CASE)
+                val match = cmdRegex.find(cleanReply)
+
+                if (match != null) {
+                    val commandAction = match.groupValues[1].trim()
+                    val speechText = cleanReply.replace(cmdRegex, "").trim()
+
+                    Log.d("DemoniTalk", "IA ejecutando comando coloquial: $commandAction")
+                    commandHandler.execute(commandAction, repository.loadCommands(), false)
+
+                    if (speechText.isNotEmpty()) {
+                        speakText(speechText) {
+                            isWaitingForCommandAfterWake = false
+                            if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) {
+                                startListening()
+                            } else {
+                                updateButtonUI()
+                            }
+                        }
                     } else {
-                        updateButtonUI()
+                        isWaitingForCommandAfterWake = false
+                        if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) {
+                            startListening()
+                        } else {
+                            updateButtonUI()
+                        }
+                    }
+                } else {
+                    speakText(cleanReply) {
+                        isWaitingForCommandAfterWake = false
+                        if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) {
+                            startListening()
+                        } else {
+                            updateButtonUI()
+                        }
                     }
                 }
             } else {
-                Log.w("DemoniTalk", "Sin respuesta de Gemini o fallo de conexión. Silencio.")
+                Log.w("DemoniTalk", "Sin respuesta de IA o fallo de conexión. Silencio.")
                 isWaitingForCommandAfterWake = false
                 if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) {
                     scheduleListeningRestart(500)

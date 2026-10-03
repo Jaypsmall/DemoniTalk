@@ -143,6 +143,8 @@ class CommandRepository(private val context: Context) {
             VoiceCommand("encender foco", "torch_on"),
             VoiceCommand("apagar foco", "torch_off"),
             VoiceCommand("primer chat", "click_first_chat"),
+            VoiceCommand("mostrar números", "show_numbers"),
+            VoiceCommand("actualizar", "show_numbers"),
             VoiceCommand("cerrar todo", "input keyevent 187 && sleep 1 && input tap 540 1800", true)
         )
     }

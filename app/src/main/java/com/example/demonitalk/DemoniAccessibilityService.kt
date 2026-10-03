@@ -346,12 +346,11 @@ class DemoniAccessibilityService : AccessibilityService() {
                 NUMBER_REFRESH_TOKEN
             )
 
-            mainHandler.postAtTime(
+            mainHandler.postDelayed(
                 {
                     refreshOverlays()
                 },
-                NUMBER_REFRESH_TOKEN,
-                150L
+                50L
             )
         }
     }
@@ -703,127 +702,57 @@ class DemoniAccessibilityService : AccessibilityService() {
     fun clickNumber(
         number: String
     ): Boolean {
+        val num = number.trim().toIntOrNull() ?: return false
 
-        val num =
-            number
-                .trim()
-                .toIntOrNull()
-                ?: return false
+        Log.d(TAG, "Intentando pulsar número: $num")
 
-        Log.d(
-            TAG,
-            "Intentando pulsar número: $num"
-        )
-
-        /*
-         * Primero usamos el mapa creado por showNumbers().
-         */
-
-        val storedNode =
-            numberedNodes[num]
-
+        // 1. Intentamos pulsar mediante AccessibilityNodeInfo
+        val storedNode = numberedNodes[num]
         if (storedNode != null) {
-
             try {
-
-                if (
-                    storedNode.isVisibleToUser &&
-                    (
-                            storedNode.isClickable ||
-                                    storedNode.parent?.isClickable == true
-                            )
-                ) {
-
-                    val target =
-                        if (storedNode.isClickable) {
-                            storedNode
-                        } else {
-                            storedNode.parent
-                        }
-
-                    if (
-                        target?.performAction(
-                            AccessibilityNodeInfo.ACTION_CLICK
-                        ) == true
-                    ) {
-
-                        Log.d(
-                            TAG,
-                            "Número $num pulsado mediante AccessibilityNodeInfo"
-                        )
-
-                        return true
-                    }
-                }
-
-            } catch (e: Exception) {
-
-                Log.e(
-                    TAG,
-                    "Error pulsando nodo número $num",
-                    e
-                )
-            }
-        }
-
-        /*
-         * Si el nodo anterior ya no es válido porque cambió
-         * la pantalla, reconstruimos los números.
-         */
-
-        rebuildNumberMap()
-
-        val refreshedNode =
-            numberedNodes[num]
-
-        if (refreshedNode != null) {
-
-            try {
-
-                val target =
-                    if (refreshedNode.isClickable) {
-                        refreshedNode
-                    } else {
-                        refreshedNode.parent
-                    }
-
-                if (
-                    target?.performAction(
-                        AccessibilityNodeInfo.ACTION_CLICK
-                    ) == true
-                ) {
-
-                    Log.d(
-                        TAG,
-                        "Número $num pulsado tras refrescar mapa"
-                    )
-
+                val target = if (storedNode.isClickable) storedNode else storedNode.parent
+                if (target?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true) {
+                    Log.d(TAG, "Número $num pulsado mediante AccessibilityNodeInfo")
+                    hideOverlays()
                     return true
                 }
-
             } catch (e: Exception) {
-
-                Log.e(
-                    TAG,
-                    "Error pulsando número refrescado $num",
-                    e
-                )
+                Log.e(TAG, "Error pulsando nodo número $num", e)
             }
         }
 
-        /*
-         * Último fallback:
-         * buscar literalmente el número como texto.
-         */
+        // 2. Si el nodo directo no consumió la acción, pulsamos por las coordenadas exactas de la etiqueta
+        val bounds = numberedBounds[num]
+        if (bounds != null) {
+            val cx = bounds.centerX()
+            val cy = bounds.centerY()
 
-        Log.d(
-            TAG,
-            "Fallback: buscando texto '$num'"
-        )
+            if (ShellUtils.isRootAvailable()) {
+                if (ShellUtils.executeCommand("input tap $cx $cy")) {
+                    Log.d(TAG, "Número $num pulsado mediante Root Shell Tap ($cx, $cy)")
+                    hideOverlays()
+                    return true
+                }
+            }
 
-        return clickText(
-            num.toString()
-        )
+            try {
+                val path = android.graphics.Path().apply { moveTo(cx.toFloat(), cy.toFloat()) }
+                val stroke = android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, 50)
+                val gesture = android.accessibilityservice.GestureDescription.Builder().addStroke(stroke).build()
+                if (dispatchGesture(gesture, null, null)) {
+                    Log.d(TAG, "Número $num pulsado mediante dispatchGesture ($cx, $cy)")
+                    hideOverlays()
+                    return true
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error en dispatchGesture para número $num", e)
+            }
+        }
+
+        // 3. Fallback final: buscar por texto
+        val textSuccess = clickText(num.toString())
+        if (textSuccess) hideOverlays()
+        return textSuccess
     }
 
     // =========================================================
