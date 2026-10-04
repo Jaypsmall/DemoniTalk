@@ -6,7 +6,7 @@ import java.text.Normalizer
 import java.util.Locale
 import java.util.regex.Pattern
 
-class CommandHandler(context: Context) {
+class CommandHandler(private val context: Context) {
 
     private var internalListener: ((String) -> Unit)? = null
 
@@ -117,10 +117,10 @@ class CommandHandler(context: Context) {
         // ---------------------------------------------------------
         // DETECCIÓN MULTI-COMANDO / SECUENCIAS DE ACCIONES
         // Detectamos conectores como *, ;, ,, &&, "luego", "después", "entonces",
-        // o "y" seguido de verbo/comando.
+        // o "y (el/la/los/las/un/una)" seguido de verbo/comando.
         // ---------------------------------------------------------
         val sequenceRegex = Regex(
-            """\s*[*;,]\s*(?=abre|abrir|pulsa|clic|click|escribe|manda|enviar|pon|reproduce|vuelve|atras|inicio|casa|recientes|buscar|busca|primer|primera|cerrar|activar|desactivar|activa|modo|silencio|detente|cuadricula|numeros|oculta|\*)|\s+(?:luego|después|despues|entonces)\s+|\s+y\s+(?=abre|abrir|pulsa|clic|click|escribe|manda|enviar|pon|reproduce|vuelve|atras|inicio|casa|recientes|buscar|busca|primer|primera|cerrar|activar|desactivar|activa|modo|silencio|detente|cuadricula|numeros|oculta)"""
+            """\s*[*;,]\s*|\s+(?:luego|después|despues|entonces)\s+|\s+y\s+(?:el\s+|la\s+|los\s+|las\s+|un\s+|una\s+)?(?=abre|abrir|abreme|pulsa|clic|click|escribe|manda|enviar|pon|reproduce|vuelve|atras|inicio|casa|recientes|buscar|busca|primer|primera|chat|cerrar|activar|desactivar|activa|modo|silencio|detente|cuadricula|numeros|oculta|foco|camara|\*)"""
         )
 
         val parts = normalizedText
@@ -157,6 +157,32 @@ class CommandHandler(context: Context) {
         Log.d("CommandHandler", "Ejecutando comando individual: '$normalizedText'")
 
         // ---------------------------------------------------------
+        // CHATS Y MENSAJES EN APPS (ej: "abre el primer chat de whatsapp", "primer chat")
+        // ---------------------------------------------------------
+        val isFirstChatPhrase = normalizedText.contains("primer chat") ||
+                normalizedText.contains("primera conversacion") ||
+                normalizedText.contains("primer contacto") ||
+                normalizedText.contains("primer mensaje") ||
+                normalizedText.contains("primera charla")
+
+        if (isFirstChatPhrase) {
+            val mentionsWhatsapp = normalizedText.contains("whatsapp") ||
+                    normalizedText.contains("wasap") ||
+                    normalizedText.contains("wasat") ||
+                    normalizedText.contains("guatsap")
+
+            if (mentionsWhatsapp) {
+                Log.d("CommandHandler", "Detectado abre WhatsApp + primer chat: '$normalizedText'")
+                executeSequence(listOf("open_app:whatsapp", "click_first_chat"), commands)
+                return true
+            } else {
+                Log.d("CommandHandler", "Detectado primer chat directo: '$normalizedText'")
+                executeAsync("click_first_chat")
+                return true
+            }
+        }
+
+        // ---------------------------------------------------------
         // ESCRIBIR / MENSAJES
         // Ejemplos:
         // "escribe hola hermano"
@@ -184,15 +210,36 @@ class CommandHandler(context: Context) {
             normalizedText == "manda este mensaje" -> return false
         }
 
+        // Helper para limpiar conectores al extraer nombre de app
+        fun extractCleanAppName(text: String): String {
+            var name = text.trim()
+            val connectors = listOf(" para ", " de ", " en ", " y ")
+            for (conn in connectors) {
+                if (name.contains(conn)) {
+                    name = name.substringBefore(conn).trim()
+                }
+            }
+            return name
+        }
+
         // ---------------------------------------------------------
         // ABRIR APLICACIÓN
         // Ejemplos:
         // "abre WhatsApp"
+        // "abreme whatsapp"
         // "abrir youtube"
         // ---------------------------------------------------------
         when {
             normalizedText.startsWith("abre ") -> {
-                val appName = normalizedText.removePrefix("abre ").trim()
+                val appName = extractCleanAppName(normalizedText.removePrefix("abre "))
+                if (appName.isNotEmpty()) {
+                    executeAsync("open_app:$appName")
+                    return true
+                }
+            }
+
+            normalizedText.startsWith("abreme ") -> {
+                val appName = extractCleanAppName(normalizedText.removePrefix("abreme "))
                 if (appName.isNotEmpty()) {
                     executeAsync("open_app:$appName")
                     return true
@@ -200,7 +247,15 @@ class CommandHandler(context: Context) {
             }
 
             normalizedText.startsWith("abrir ") -> {
-                val appName = normalizedText.removePrefix("abrir ").trim()
+                val appName = extractCleanAppName(normalizedText.removePrefix("abrir "))
+                if (appName.isNotEmpty()) {
+                    executeAsync("open_app:$appName")
+                    return true
+                }
+            }
+
+            normalizedText.startsWith("abrirme ") -> {
+                val appName = extractCleanAppName(normalizedText.removePrefix("abrirme "))
                 if (appName.isNotEmpty()) {
                     executeAsync("open_app:$appName")
                     return true
@@ -258,7 +313,11 @@ class CommandHandler(context: Context) {
 
             "numeros",
             "muestra numeros",
-            "mostrar numeros" -> {
+            "mostrar numeros",
+            "actualizar",
+            "actualizar numeros",
+            "refrescar",
+            "refrescar numeros" -> {
                 executeAsync("show_numbers")
                 return true
             }
@@ -442,21 +501,16 @@ class CommandHandler(context: Context) {
         text: String,
         trigger: String
     ): Boolean {
-
         if (text.length < 4 || trigger.length < 4) {
             return false
         }
+        // Si el texto completo es mucho más largo que el disparador, no es una coincidencia directa
+        if (Math.abs(text.length - trigger.length) > 5) {
+            return false
+        }
 
-        val prefixLength =
-            (trigger.length * 0.7)
-                .toInt()
-                .coerceAtLeast(1)
-
-        val prefix = trigger.substring(
-            0,
-            prefixLength.coerceAtMost(trigger.length)
-        )
-
+        val prefixLength = (trigger.length * 0.7).toInt().coerceAtLeast(1)
+        val prefix = trigger.substring(0, prefixLength.coerceAtMost(trigger.length))
         return text.contains(prefix)
     }
 
@@ -536,76 +590,42 @@ class CommandHandler(context: Context) {
         }
 
         // ---------------------------------------------------------
-        // ROOT
+        // MODO DE EJECUCIÓN (HYBRID / ROOT / ACCESSIBILITY)
         // ---------------------------------------------------------
+        val repository = CommandRepository(context)
+        val mode = repository.getExecutionMode()
+
+        val allowRoot = (mode == "HYBRID" || mode == "ROOT")
+        val allowAccessibility = (mode == "HYBRID" || mode == "ACCESSIBILITY")
 
         var shellSuccess = false
 
-        if (ShellUtils.isRootAvailable()) {
-
+        if (allowRoot && ShellUtils.isRootAvailable()) {
             shellSuccess = try {
-
                 when {
-
-                    cleanAction == "global_back" -> {
-                        ShellUtils.executeCommand("input keyevent 4")
-                    }
-
-                    cleanAction == "global_home" -> {
-                        ShellUtils.executeCommand("input keyevent 3")
-                    }
-
-                    cleanAction == "global_recents" -> {
-                        ShellUtils.executeCommand("input keyevent 187")
-                    }
-
+                    cleanAction == "global_back" -> ShellUtils.executeCommand("input keyevent 4")
+                    cleanAction == "global_home" -> ShellUtils.executeCommand("input keyevent 3")
+                    cleanAction == "global_recents" -> ShellUtils.executeCommand("input keyevent 187")
                     cleanAction.startsWith("type:") -> {
                         val textToType = cleanAction.removePrefix("type:")
-                        val escapedText = textToType
-                            .replace("\\", "\\\\")
-                            .replace("\"", "\\\"")
-                            .replace(" ", "%s")
-
+                        val escapedText = textToType.replace("\\", "\\\\").replace("\"", "\\\"").replace(" ", "%s")
                         ShellUtils.executeCommand("input text \"$escapedText\"")
                     }
-
-                    cleanAction.startsWith("open_app:") || cleanAction.startsWith("click_") || cleanAction == "show_grid" || cleanAction == "show_numbers" || cleanAction == "hide_overlays" || cleanAction == "click_send" -> {
-                        false
-                    }
-
-                    else -> {
-                        ShellUtils.executeCommand(cleanAction)
-                    }
+                    cleanAction.startsWith("open_app:") || cleanAction.startsWith("click_") || cleanAction == "show_grid" || cleanAction == "show_numbers" || cleanAction == "hide_overlays" || cleanAction == "click_send" -> false
+                    else -> ShellUtils.executeCommand(cleanAction)
                 }
-
             } catch (e: Exception) {
                 Log.e("CommandHandler", "Error ejecutando Root: $cleanAction", e)
                 false
             }
         }
 
-        // ---------------------------------------------------------
-        // FALLBACK ACCESSIBILITY
-        // ---------------------------------------------------------
-
-        if (!shellSuccess) {
-
-            Log.d(
-                "CommandHandler",
-                "Root no ejecutó '$cleanAction'. Usando AccessibilityService."
-            )
-
+        if (!shellSuccess && allowAccessibility) {
+            Log.d("CommandHandler", "Ejecutando con AccessibilityService: '$cleanAction'")
             try {
-
                 accessibilityController.execute(cleanAction)
-
             } catch (e: Exception) {
-
-                Log.e(
-                    "CommandHandler",
-                    "Error ejecutando AccessibilityService: $cleanAction",
-                    e
-                )
+                Log.e("CommandHandler", "Error ejecutando AccessibilityService: $cleanAction", e)
             }
         }
     }
