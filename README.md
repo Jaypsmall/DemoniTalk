@@ -1,11 +1,11 @@
 
-# 😈 DemoniTalk (v2.0.1 - DemonicAI Edition)   ![Android](https://img.shields.io/badge/Android-181717?style=flat&logo=android&logoColor=yellow) ![Kotlin](https://img.shields.io/badge/kotlin-181717?style=flat&logo=kotlin&logoColor=yellow) 
+# 😈 DemoniTalk (v2.0.1 - DemonicAI Edition)   ![Android](https://img.shields.io/badge/Android-181717?style=flat&logo=android&logoColor=FF8B3D) ![Kotlin](https://img.shields.io/badge/kotlin-181717?style=flat&logo=kotlin&logoColor=FF8B3D) 
 
 ## 😈 DemoniTalk — AI, Root & Accessibility Voice Automation Engine    
 <a href="https://github.com/Jaypsmall/DemoniTalk/releases/download/demoni/DemoniTalk_v2.0.1_AI.apk">
-   <img src="https://img.shields.io/badge/DOWNLOAD_v2.0.1_AI_APK-181717?style=flat&logo=android&logoColor=yellow" alt="Download AI Release">
+   <img src="https://img.shields.io/badge/DOWNLOAD_v2.0.1_AI_APK-181717?style=flat&logo=android&logoColor=FF8B3D" alt="Download AI Release">
 <a href="https://github.com/Jaypsmall/DemoniTalk/releases/download/root/DemoniTalk_v1.0.3.apk">
-   <img src="https://img.shields.io/badge/DOWNLOAD_v1.0.3_APK-181717?style=flat&logo=android&logoColor=yellow" alt="Download Root Release">
+   <img src="https://img.shields.io/badge/DOWNLOAD_v1.0.3_APK-181717?style=flat&logo=android&logoColor=FF8B3D" alt="Download Root Release">
  </a>
 
 > [!NOTE]
