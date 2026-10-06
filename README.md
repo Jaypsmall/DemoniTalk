@@ -9,6 +9,8 @@
   <img src="https://img.shields.io/badge/DOWNLOAD_DEMONITALK_v1.0.3_APK-181717?style=flat&logo=android&logoColor=FF8B3D" alt="Download Root Release">
 </a>
 
+---
+
 > [!NOTE]
 > **DemoniTalk** es un asistente de voz de vanguardia y un motor de automatización multinivel para Android. Combina la potencia del acceso a superusuario (Root), el motor de **Servicios de Accesibilidad (AccessibilityService API)** e integración con **IA / LLM local** para ejecutar scripts de consola, macros táctiles complejas e interacciones del sistema mediante voz e interfaz flotante.
 
