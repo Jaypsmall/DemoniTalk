@@ -35,6 +35,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
@@ -234,7 +235,7 @@ class MainActivity : ComponentActivity() {
                             scope.launch { drawerState.close() } 
                         }
                         Spacer(modifier = Modifier.height(16.dp))
-                        DrawerButton(text = if (isEnglish) "Help & Guide" else "Ayuda y Guía", icon = Icons.Default.HelpOutline, iconTint = com.example.demonitalk.ui.theme.BrimstoneYellow) { showHelpDialog = true; scope.launch { drawerState.close() } }
+                        DrawerButton(text = if (isEnglish) "Help & Guide" else "Ayuda y Guía", icon = Icons.AutoMirrored.Filled.HelpOutline, iconTint = com.example.demonitalk.ui.theme.BrimstoneYellow) { showHelpDialog = true; scope.launch { drawerState.close() } }
                         
                         Spacer(modifier = Modifier.weight(1f))
                         Column(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {

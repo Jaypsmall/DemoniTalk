@@ -1,7 +1,6 @@
 package com.example.demonitalk
 
 import android.annotation.SuppressLint
-import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
@@ -26,41 +25,69 @@ class SpeechRecognitionManager(
     private var speechRecognizer: SpeechRecognizer? = null
     private val audioManager: AudioManager =
         context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    private var originalSystemVolume: Int = -1
+    private val originalStreamVolumes = mutableMapOf<Int, Int>()
+    private var audioMutedByRecognizer = false
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val streamsToMute = intArrayOf(
+        AudioManager.STREAM_SYSTEM,
+        AudioManager.STREAM_NOTIFICATION,
+        AudioManager.STREAM_ALARM,
+        AudioManager.STREAM_DTMF,
+        AudioManager.STREAM_ACCESSIBILITY
+    )
 
     var isListening = false
         private set
 
     fun muteAudio(mute: Boolean) {
+        if (!mute) {
+            restoreRecognitionAudio(force = false)
+            return
+        }
+
         try {
-            if (mute) {
-                if (originalSystemVolume == -1) {
-                    originalSystemVolume = audioManager.getStreamVolume(AudioManager.STREAM_SYSTEM)
+            if (!audioMutedByRecognizer) {
+                streamsToMute.forEach { stream ->
+                    originalStreamVolumes[stream] = audioManager.getStreamVolume(stream)
+                    try {
+                        audioManager.adjustStreamVolume(stream, AudioManager.ADJUST_MUTE, 0)
+                    } catch (_: Exception) {
+                    }
                 }
-
-                // Silenciar todos los canales por los que la app de Búsqueda de Google o Android emite el pitido de micrófono
-                try { audioManager.adjustStreamVolume(AudioManager.STREAM_SYSTEM, AudioManager.ADJUST_MUTE, 0) } catch (_: Exception) {}
-                try { audioManager.adjustStreamVolume(AudioManager.STREAM_NOTIFICATION, AudioManager.ADJUST_MUTE, 0) } catch (_: Exception) {}
-                try { audioManager.adjustStreamVolume(AudioManager.STREAM_ALARM, AudioManager.ADJUST_MUTE, 0) } catch (_: Exception) {}
-                try { audioManager.setStreamVolume(AudioManager.STREAM_SYSTEM, 0, 0) } catch (_: Exception) {}
-            } else {
-                try { audioManager.adjustStreamVolume(AudioManager.STREAM_SYSTEM, AudioManager.ADJUST_UNMUTE, 0) } catch (_: Exception) {}
-                try { audioManager.adjustStreamVolume(AudioManager.STREAM_NOTIFICATION, AudioManager.ADJUST_UNMUTE, 0) } catch (_: Exception) {}
-                try { audioManager.adjustStreamVolume(AudioManager.STREAM_ALARM, AudioManager.ADJUST_UNMUTE, 0) } catch (_: Exception) {}
-
-                if (originalSystemVolume != -1) {
-                    val volumeToRestore = originalSystemVolume
-                    originalSystemVolume = -1
-                    mainHandler.postDelayed({
-                        try {
-                            audioManager.setStreamVolume(AudioManager.STREAM_SYSTEM, volumeToRestore, 0)
-                        } catch (_: Exception) {}
-                    }, 600)
-                }
+                audioMutedByRecognizer = true
             }
         } catch (e: Exception) {
-            Log.d("SpeechRecManager", "Error gestionando audio: ${e.message}")
+            Log.d("SpeechRecManager", "Error silenciando pitido de reconocimiento: ${e.message}")
+        }
+    }
+
+    private fun restoreRecognitionAudio(force: Boolean) {
+        if (!force && isModeActive()) {
+            return
+        }
+
+        try {
+            streamsToMute.forEach { stream ->
+                try {
+                    audioManager.adjustStreamVolume(stream, AudioManager.ADJUST_UNMUTE, 0)
+                } catch (_: Exception) {
+                }
+            }
+
+            val volumesToRestore = originalStreamVolumes.toMap()
+            originalStreamVolumes.clear()
+            audioMutedByRecognizer = false
+
+            mainHandler.postDelayed({
+                volumesToRestore.forEach { (stream, volume) ->
+                    try {
+                        audioManager.setStreamVolume(stream, volume, 0)
+                    } catch (_: Exception) {
+                    }
+                }
+            }, 500)
+        } catch (e: Exception) {
+            Log.d("SpeechRecManager", "Error restaurando audio de reconocimiento: ${e.message}")
         }
     }
 
@@ -72,7 +99,15 @@ class SpeechRecognitionManager(
         }
 
         try {
-            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context.applicationContext)
+            speechRecognizer = if (
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                SpeechRecognizer.isOnDeviceRecognitionAvailable(context.applicationContext)
+            ) {
+                Log.i("SpeechRecManager", "Usando reconocedor de voz local para evitar pitidos del motor de Google")
+                SpeechRecognizer.createOnDeviceSpeechRecognizer(context.applicationContext)
+            } else {
+                SpeechRecognizer.createSpeechRecognizer(context.applicationContext)
+            }
             speechRecognizer?.setRecognitionListener(speechListener)
         } catch (e: Exception) {
             Log.e("SpeechRecManager", "Error creando SpeechRecognizer: ${e.message}", e)
@@ -113,7 +148,11 @@ class SpeechRecognitionManager(
 
             Log.e("SpeechRecManager", "Error de reconocimiento [$error]: $message")
             isListening = false
-            muteAudio(false)
+            if (isModeActive()) {
+                muteAudio(true)
+            } else {
+                muteAudio(false)
+            }
 
             if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ||
                 error == SpeechRecognizer.ERROR_CLIENT ||
@@ -151,7 +190,11 @@ class SpeechRecognitionManager(
 
         override fun onResults(results: Bundle?) {
             isListening = false
-            muteAudio(false)
+            if (isModeActive()) {
+                muteAudio(true)
+            } else {
+                muteAudio(false)
+            }
 
             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
             if (!matches.isNullOrEmpty()) {
@@ -192,9 +235,11 @@ class SpeechRecognitionManager(
         } catch (e: Exception) {
             Log.e("SpeechRecManager", "Error al iniciar captura de voz: ${e.message}", e)
             isListening = false
-            muteAudio(false)
             if (isModeActive()) {
+                muteAudio(true)
                 onErrorRestart()
+            } else {
+                muteAudio(false)
             }
         }
     }
@@ -202,7 +247,7 @@ class SpeechRecognitionManager(
     fun stopListening() {
         isListening = false
         try { speechRecognizer?.cancel() } catch (_: Exception) {}
-        muteAudio(false)
+        restoreRecognitionAudio(force = true)
     }
 
     fun resetSpeechRecognizer() {
@@ -215,6 +260,7 @@ class SpeechRecognitionManager(
     fun destroy() {
         stopListening()
         resetSpeechRecognizer()
+        restoreRecognitionAudio(force = true)
         mainHandler.removeCallbacksAndMessages(null)
     }
 }
