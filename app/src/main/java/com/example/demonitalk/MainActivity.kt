@@ -238,7 +238,7 @@ class MainActivity : ComponentActivity() {
                         
                         Spacer(modifier = Modifier.weight(1f))
                         Column(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(text = "DemoniTalk v2.0.1", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (isDarkMode) AshGrey else Color.DarkGray)
+                            Text(text = "DemoniTalk v2.0.2", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (isDarkMode) AshGrey else Color.DarkGray)
                             Text(text = "Created by JAYLIZ with ❤️", fontSize = 9.sp, color = (if (isDarkMode) AshGrey else Color.DarkGray).copy(0.7f))
                         }
                     }
@@ -562,9 +562,9 @@ class MainActivity : ComponentActivity() {
                     Spacer(Modifier.height(4.dp))
                     Text(
                         text = if (isEnglish)
-                            "Gemini API provides official Google responses using your key. Free AI provides fast answers directly without needing an API key."
+                            "Free public AI provides fast voice answers without needing an API key."
                         else
-                            "Gemini API utiliza tu clave de Google para respuestas avanzadas. La IA Gratuita contesta de forma ultra rápida sin requerir ninguna clave.",
+                            "La IA Gratuita pública contesta rápido por voz sin necesitar clave API.",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(0.85f)
                     )
@@ -580,26 +580,28 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun AiConfigDialog(onDismiss: () -> Unit, isEnglish: Boolean) {
-        var key by remember { mutableStateOf(repository.getGeminiApiKey()) }
         var aiEnabled by remember { mutableStateOf(repository.isAiEnabled()) }
-        var geminiEnabled by remember { mutableStateOf(repository.isGeminiEngineEnabled()) }
-        var freeAiEnabled by remember { mutableStateOf(repository.isFreeAiEngineEnabled()) }
-        var testing by remember { mutableStateOf(false) }
-        var testResult by remember { mutableStateOf<String?>(null) }
-        val scope = rememberCoroutineScope()
+        var instructions by remember { mutableStateOf(repository.getAiInstructions()) }
+        var memory by remember { mutableStateOf(repository.getAiMemory()) }
 
         AlertDialog(
             onDismissRequest = onDismiss,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
             containerColor = MaterialTheme.colorScheme.surface,
-            title = { Text("CONFIGURACIÓN DE IA", color = com.example.demonitalk.ui.theme.DemoniPurple, fontWeight = FontWeight.Black) },
+            title = { Text(if (isEnglish) "AI BRAIN & MEMORY" else "CEREBRO Y MEMORIA IA", color = com.example.demonitalk.ui.theme.DemoniPurple, fontWeight = FontWeight.Black) },
             text = {
-                Column {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 450.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Respuestas con IA",
+                            text = if (isEnglish) "AI Voice Replies" else "Respuestas con IA",
                             color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp,
@@ -618,86 +620,67 @@ class MainActivity : ComponentActivity() {
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(0.1f))
                     Spacer(Modifier.height(8.dp))
 
-                    Text("MOTORES DE IA DISPONIBLES:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(if (isEnglish) "ACTIVE AI ENGINE:" else "MOTOR DE IA ACTIVO:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.height(6.dp))
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Gemini API (Oficial)", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                        androidx.compose.material3.Switch(
-                            checked = geminiEnabled,
-                            onCheckedChange = { 
-                                geminiEnabled = it
-                                repository.saveGeminiEngineEnabled(it)
-                            }
-                        )
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("IA Gratuita (Pública)", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                        androidx.compose.material3.Switch(
-                            checked = freeAiEnabled,
-                            onCheckedChange = { 
-                                freeAiEnabled = it
-                                repository.saveFreeAiEngineEnabled(it)
-                            }
-                        )
-                    }
+                    Text(
+                        text = if (isEnglish)
+                            "Free public AI. No API key is required."
+                        else
+                            "IA Gratuita pública. No necesita clave API.",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 12.sp
+                    )
 
                     Spacer(Modifier.height(12.dp))
-                    Text("Clave API Gemini (Opcional):", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
-                    Spacer(Modifier.height(6.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(0.1f))
+                    Spacer(Modifier.height(12.dp))
+
+                    Text(
+                        text = if (isEnglish) "CUSTOM RULES & GUIDELINES:" else "PAUTAS E INSTRUCCIONES PERSONALIZADAS:",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.height(4.dp))
                     androidx.compose.material3.OutlinedTextField(
-                        value = key, 
-                        onValueChange = { key = it; testResult = null }, 
-                        label = { Text("API Key") },
-                        placeholder = { Text("Pega tu clave API aquí...") },
-                        singleLine = true,
+                        value = instructions,
+                        onValueChange = { instructions = it },
+                        label = { Text(if (isEnglish) "Guidelines / Persona" else "Pautas (ej. Háblame de tú, llámame Jefe)") },
+                        placeholder = { Text("Escribe cómo quieres que se comporte la IA...") },
+                        maxLines = 3,
                         modifier = Modifier.fillMaxWidth()
                     )
-                    if (testResult != null) {
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = testResult!!, 
-                            fontSize = 11.sp, 
-                            color = if (testResult!!.startsWith("¡Conectado")) Color(0xFF2E7D32) else com.example.demonitalk.ui.theme.HellRed
-                        )
-                    }
+
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = if (isEnglish) "REMEMBERS & SAVED FACTS:" else "MEMORIA Y DATOS RECORDADOS POR LA IA:",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    androidx.compose.material3.OutlinedTextField(
+                        value = memory,
+                        onValueChange = { memory = it },
+                        label = { Text(if (isEnglish) "Saved memory notes" else "Memoria guardada (ej. • Mi cumpleaños es el 15 de marzo)") },
+                        placeholder = { Text("Datos que la IA recordará siempre...") },
+                        maxLines = 4,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             },
             confirmButton = { 
                 TextButton(
-                    enabled = !testing,
                     onClick = { 
                         repository.saveAiEnabled(aiEnabled)
-                        repository.saveGeminiEngineEnabled(geminiEnabled)
-                        repository.saveFreeAiEngineEnabled(freeAiEnabled)
-
-                        if (key.trim().isNotEmpty()) {
-                            testing = true
-                            val cleanKey = key.trim()
-                            repository.saveGeminiApiKey(cleanKey)
-                            val assistant = AiAssistant(this@MainActivity)
-                            scope.launch {
-                                val reply = assistant.askGemini("Di Hola")
-                                testing = false
-                                testResult = if (!reply.isNullOrEmpty()) {
-                                    "¡Conectado con éxito! 😈 Respuesta: $reply"
-                                } else {
-                                    "Error de conexión con Gemini."
-                                }
-                            }
-                        } else {
-                            onDismiss()
-                        }
+                        repository.saveFreeAiEngineEnabled(true)
+                        repository.saveAiInstructions(instructions)
+                        repository.saveAiMemory(memory)
+                        onDismiss()
                     }
                 ) { 
-                    Text(if (testing) "PROBANDO..." else if (key.trim().isNotEmpty()) "PROBAR Y GUARDAR" else "GUARDAR", color = com.example.demonitalk.ui.theme.DemoniPurple, fontWeight = FontWeight.Bold) 
+                    Text("GUARDAR", color = com.example.demonitalk.ui.theme.DemoniPurple, fontWeight = FontWeight.Bold)
                 } 
             },
             dismissButton = { TextButton(onClick = onDismiss) { Text("CERRAR", color = AshGrey) } }
