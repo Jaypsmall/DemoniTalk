@@ -54,10 +54,9 @@ class AiAssistant(context: Context) {
 
     fun fetchPollinationsGet(prompt: String): String? {
         return try {
-            val cleanPrompt = prompt.trim()
-            val encodedPrompt = URLEncoder.encode(cleanPrompt, "UTF-8").replace("+", "%20")
-            val systemSnippet = "Eres Demoni, asistente de voz en español. Responde corto en máximo 2 frases. SIN EMOJIS."
-            val encodedSystem = URLEncoder.encode(systemSnippet, "UTF-8").replace("+", "%20")
+            val systemPrompt = "Eres Demoni, asistente de voz en español. Responde en máximo 2 frases. REGLA: SIN EMOJIS (se leen en voz alta). Si piden acciones/apps coloquiales, usa [CMD:acciones] (ej: [CMD:com.whatsapp; click_first_chat; type:texto; click_send] o [CMD:open_app:instagram] o [CMD:torch_on])."
+            val encodedPrompt = URLEncoder.encode(prompt, "UTF-8")
+            val encodedSystem = URLEncoder.encode(systemPrompt, "UTF-8")
 
             val urlString = "https://text.pollinations.ai/$encodedPrompt?system=$encodedSystem"
             val url = URL(urlString)

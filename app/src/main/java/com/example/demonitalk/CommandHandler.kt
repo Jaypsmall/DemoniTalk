@@ -124,7 +124,7 @@ class CommandHandler(private val context: Context) {
         }
 
         val sequenceRegex = Regex(
-            """\s*[*;,]\s*|\s+(?:luego|después|despues|entonces)\s+|\s+y\s+(?:el\s+|la\s+|los\s+|las\s+|un\s+|una\s+|entra\s+en\s+|entra\s+a\s+|ve\s+a\s+)?(?=$lookaheadWords)"""
+            """\s*[*;,]\s*|\s+(?:luego|después|despues|entonces)\s+|\s+y\s+(?:el\s+|la\s+|los\s+|las\s+|un\s+|una\s+)?(?=abre|abrir|abreme|pulsa|clic|click|escribe|manda|enviar|pon|reproduce|vuelve|atras|inicio|casa|recientes|buscar|busca|primer|primera|chat|cerrar|activar|desactivar|activa|modo|silencio|detente|cuadricula|numeros|oculta|foco|camara|\*)"""
         )
 
         val parts = normalizedText
@@ -175,27 +175,38 @@ class CommandHandler(private val context: Context) {
 
         Log.d("CommandHandler", "Ejecutando comando individual: '$normalizedText'")
 
-        // 1. CHATS Y MENSAJES EN APPS (ej: "abrió el primer chat de whatsapp", "primer chat")
+        // ---------------------------------------------------------
+        // CHATS Y MENSAJES EN APPS (ej: "abre el primer chat de whatsapp", "primer chat")
+        // ---------------------------------------------------------
         val isFirstChatPhrase = normalizedText.contains("primer chat") ||
                 normalizedText.contains("primera conversacion") ||
                 normalizedText.contains("primer contacto") ||
                 normalizedText.contains("primer mensaje") ||
                 normalizedText.contains("primera charla")
 
-        val mentionedApp = findMentionedApp(normalizedText)
-
         if (isFirstChatPhrase) {
-            if (!mentionedApp.isNullOrEmpty()) {
-                Log.d("CommandHandler", "Detectado abre app '$mentionedApp' + primer chat: '$normalizedText'")
-                executeSequence(listOf("open_app:$mentionedApp", "click_first_chat"), commands)
+            val mentionsWhatsapp = normalizedText.contains("whatsapp") ||
+                    normalizedText.contains("wasap") ||
+                    normalizedText.contains("wasat") ||
+                    normalizedText.contains("guatsap")
+
+            if (mentionsWhatsapp) {
+                Log.d("CommandHandler", "Detectado abre WhatsApp + primer chat: '$normalizedText'")
+                executeSequence(listOf("open_app:whatsapp", "click_first_chat"), commands)
+                return true
             } else {
                 Log.d("CommandHandler", "Detectado primer chat directo: '$normalizedText'")
                 executeAsync("click_first_chat")
+                return true
             }
-            return true
         }
 
-        // 2. ESCRIBIR / MENSAJES
+        // ---------------------------------------------------------
+        // ESCRIBIR / MENSAJES
+        // Ejemplos:
+        // "escribe hola hermano"
+        // "manda este mensaje hola"
+        // ---------------------------------------------------------
         when {
             normalizedText.startsWith("escribe ") -> {
                 val content = normalizedText.removePrefix("escribe ").trim()
@@ -214,12 +225,56 @@ class CommandHandler(private val context: Context) {
             }
         }
 
-        // 3. ABRIR APLICACIÓN (ej: "abre whatsapp", "abrió la cámara", "abreme instagram")
-        if (normalizedText.contains(Regex("""\b(?:abre|abrio|abreme|abrir|abrirme|lanzar)\b"""))) {
-            val appToOpen = mentionedApp ?: findMentionedApp(normalizedText)
-            if (!appToOpen.isNullOrEmpty()) {
-                executeAsync("open_app:$appToOpen")
-                return true
+        // Helper para limpiar conectores al extraer nombre de app
+        fun extractCleanAppName(text: String): String {
+            var name = text.trim()
+            val connectors = listOf(" para ", " de ", " en ", " y ")
+            for (conn in connectors) {
+                if (name.contains(conn)) {
+                    name = name.substringBefore(conn).trim()
+                }
+            }
+            return name
+        }
+
+        // ---------------------------------------------------------
+        // ABRIR APLICACIÓN
+        // Ejemplos:
+        // "abre WhatsApp"
+        // "abreme whatsapp"
+        // "abrir youtube"
+        // ---------------------------------------------------------
+        when {
+            normalizedText.startsWith("abre ") -> {
+                val appName = extractCleanAppName(normalizedText.removePrefix("abre "))
+                if (appName.isNotEmpty()) {
+                    executeAsync("open_app:$appName")
+                    return true
+                }
+            }
+
+            normalizedText.startsWith("abreme ") -> {
+                val appName = extractCleanAppName(normalizedText.removePrefix("abreme "))
+                if (appName.isNotEmpty()) {
+                    executeAsync("open_app:$appName")
+                    return true
+                }
+            }
+
+            normalizedText.startsWith("abrir ") -> {
+                val appName = extractCleanAppName(normalizedText.removePrefix("abrir "))
+                if (appName.isNotEmpty()) {
+                    executeAsync("open_app:$appName")
+                    return true
+                }
+            }
+
+            normalizedText.startsWith("abrirme ") -> {
+                val appName = extractCleanAppName(normalizedText.removePrefix("abrirme "))
+                if (appName.isNotEmpty()) {
+                    executeAsync("open_app:$appName")
+                    return true
+                }
             }
         }
 

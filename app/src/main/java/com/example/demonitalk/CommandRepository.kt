@@ -14,9 +14,32 @@ class CommandRepository(private val context: Context) {
     private val EXPORT_PATH_KEY = "export_path"
     private val AI_ENABLED_KEY = "ai_enabled"
     private val EXECUTION_MODE_KEY = "execution_mode"
+    private val GEMINI_ENGINE_ENABLED_KEY = "gemini_engine_enabled"
     private val FREE_AI_ENGINE_ENABLED_KEY = "free_ai_engine_enabled"
-    private val AI_INSTRUCTIONS_KEY = "ai_instructions"
-    private val AI_MEMORY_KEY = "ai_memory"
+
+    fun saveExecutionMode(mode: String) {
+        prefs.edit { putString(EXECUTION_MODE_KEY, mode) }
+    }
+
+    fun getExecutionMode(): String {
+        return prefs.getString(EXECUTION_MODE_KEY, "HYBRID") ?: "HYBRID"
+    }
+
+    fun saveGeminiEngineEnabled(enabled: Boolean) {
+        prefs.edit { putBoolean(GEMINI_ENGINE_ENABLED_KEY, enabled) }
+    }
+
+    fun isGeminiEngineEnabled(): Boolean {
+        return prefs.getBoolean(GEMINI_ENGINE_ENABLED_KEY, true)
+    }
+
+    fun saveFreeAiEngineEnabled(enabled: Boolean) {
+        prefs.edit { putBoolean(FREE_AI_ENGINE_ENABLED_KEY, enabled) }
+    }
+
+    fun isFreeAiEngineEnabled(): Boolean {
+        return prefs.getBoolean(FREE_AI_ENGINE_ENABLED_KEY, true)
+    }
 
     fun saveAiInstructions(instructions: String) {
         prefs.edit { putString(AI_INSTRUCTIONS_KEY, instructions) }
