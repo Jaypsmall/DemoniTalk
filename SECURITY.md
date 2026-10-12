@@ -6,8 +6,8 @@ Use the table below to see which versions of the project currently receive secur
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 2.0.x   | :green_check_mark: |
-| 1.0.x   | :green_check_mark: |
+| 2.0.x   | :white_check_mark: |
+| 1.0.x   | :white_check_mark: |
 
 ## Reporting a Vulnerability
 
