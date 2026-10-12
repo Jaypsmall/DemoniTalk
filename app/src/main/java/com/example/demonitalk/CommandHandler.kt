@@ -29,27 +29,18 @@ class CommandHandler(private val context: Context) {
      * pero "demonizar" NO se modifica.
      */
     private fun String.normalize(): String {
-
         val nfdNormalizedString =
             Normalizer.normalize(this, Normalizer.Form.NFD)
 
         val pattern =
             Pattern.compile("\\p{InCombiningDiacriticalMarks}+")
 
-        val base = pattern
+        return pattern
             .matcher(nfdNormalizedString)
             .replaceAll("")
             .lowercase(Locale.getDefault())
             .trim()
             .replace(Regex("\\s+"), " ")
-
-        return base
-            .replace(Regex("""\bdemonio\b"""), "maquina")
-            .replace(Regex("""\bdemoni\s+talk\b"""), "maquina")
-            .replace(Regex("""\bdemoni\b"""), "maquina")
-            .replace(Regex("""\bputa\b"""), "maquina")
-            .replace(Regex("""\bp\*\*\*\b"""), "maquina")
-            .trim()
     }
 
     /**
@@ -57,6 +48,8 @@ class CommandHandler(private val context: Context) {
      */
     private val wakeWords: List<String>
         get() = listOf(
+            "demoni",
+            "demonio",
             "hermano",
             "amigo",
             "maquina"
@@ -117,8 +110,19 @@ class CommandHandler(private val context: Context) {
         // ---------------------------------------------------------
         // DETECCIÓN MULTI-COMANDO / SECUENCIAS DE ACCIONES
         // Detectamos conectores como *, ;, ,, &&, "luego", "después", "entonces",
-        // o "y (el/la/los/las/un/una)" seguido de verbo/comando.
+        // "y (el/la/entra en...)" o cualquier nombre de comando personalizado (tarjetas).
         // ---------------------------------------------------------
+        val customTriggersPattern = commands
+            .map { it.trigger.lowercase().trim() }
+            .filter { it.length >= 3 }
+            .joinToString("|") { Regex.escape(it) }
+
+        val lookaheadWords = if (customTriggersPattern.isNotEmpty()) {
+            "abre|abrir|abreme|pulsa|clic|click|escribe|manda|enviar|pon|reproduce|vuelve|atras|inicio|casa|recientes|buscar|busca|primer|primera|chat|cerrar|activar|desactivar|activa|modo|silencio|detente|cuadricula|numeros|oculta|foco|camara|entra|archivados|$customTriggersPattern|\\*"
+        } else {
+            "abre|abrir|abreme|pulsa|clic|click|escribe|manda|enviar|pon|reproduce|vuelve|atras|inicio|casa|recientes|buscar|busca|primer|primera|chat|cerrar|activar|desactivar|activa|modo|silencio|detente|cuadricula|numeros|oculta|foco|camara|entra|archivados|\\*"
+        }
+
         val sequenceRegex = Regex(
             """\s*[*;,]\s*|\s+(?:luego|después|despues|entonces)\s+|\s+y\s+(?:el\s+|la\s+|los\s+|las\s+|un\s+|una\s+)?(?=abre|abrir|abreme|pulsa|clic|click|escribe|manda|enviar|pon|reproduce|vuelve|atras|inicio|casa|recientes|buscar|busca|primer|primera|chat|cerrar|activar|desactivar|activa|modo|silencio|detente|cuadricula|numeros|oculta|foco|camara|\*)"""
         )
@@ -139,6 +143,23 @@ class CommandHandler(private val context: Context) {
         return if (executed) CommandResult.Executed else CommandResult.Ignored
     }
 
+    private fun findMentionedApp(text: String): String? {
+        val commonApps = listOf(
+            "whatsapp", "wasap", "telegram", "instagram", "facebook",
+            "youtube", "spotify", "tiktok", "camara", "camera",
+            "ajustes", "settings", "calculadora", "galeria", "gallery",
+            "contactos", "contacts", "telefono", "phone", "mensajes", "messages"
+        )
+        for (app in commonApps) {
+            if (text.contains(app)) {
+                return if (app == "wasap") "whatsapp" else app
+            }
+        }
+        val openRegex = Regex("""\b(?:abre|abrio|abreme|abrir|abrirme|pon|lanzar)\s+(?:el\s+|la\s+|los\s+|las\s+|aplicacion\s+|app\s+)?([a-z0-9_]+)\b""")
+        val match = openRegex.find(text)
+        return match?.groupValues?.get(1)
+    }
+
     /**
      * Procesa un comando o acción individual.
      */
@@ -148,8 +169,6 @@ class CommandHandler(private val context: Context) {
     ): Boolean {
 
         var normalizedText = text.normalize()
-
-        // Eliminar asteriscos, comas o símbolos al inicio si los hay
         normalizedText = normalizedText.replace(Regex("^[*;,\\s]+"), "").trim()
 
         if (normalizedText.isEmpty()) return false
@@ -197,8 +216,6 @@ class CommandHandler(private val context: Context) {
                 }
             }
 
-            normalizedText == "escribe" -> return false
-
             normalizedText.startsWith("manda este mensaje ") -> {
                 val content = normalizedText.removePrefix("manda este mensaje ").trim()
                 if (content.isNotEmpty()) {
@@ -206,8 +223,6 @@ class CommandHandler(private val context: Context) {
                     return true
                 }
             }
-
-            normalizedText == "manda este mensaje" -> return false
         }
 
         // Helper para limpiar conectores al extraer nombre de app

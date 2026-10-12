@@ -35,6 +35,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
@@ -234,11 +235,11 @@ class MainActivity : ComponentActivity() {
                             scope.launch { drawerState.close() } 
                         }
                         Spacer(modifier = Modifier.height(16.dp))
-                        DrawerButton(text = if (isEnglish) "Help & Guide" else "Ayuda y Guía", icon = Icons.Default.HelpOutline, iconTint = com.example.demonitalk.ui.theme.BrimstoneYellow) { showHelpDialog = true; scope.launch { drawerState.close() } }
+                        DrawerButton(text = if (isEnglish) "Help & Guide" else "Ayuda y Guía", icon = Icons.AutoMirrored.Filled.HelpOutline, iconTint = com.example.demonitalk.ui.theme.BrimstoneYellow) { showHelpDialog = true; scope.launch { drawerState.close() } }
                         
                         Spacer(modifier = Modifier.weight(1f))
                         Column(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(text = "DemoniTalk v2.0.1", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (isDarkMode) AshGrey else Color.DarkGray)
+                            Text(text = "DemoniTalk v2.0.2", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (isDarkMode) AshGrey else Color.DarkGray)
                             Text(text = "Created by JAYLIZ with ❤️", fontSize = 9.sp, color = (if (isDarkMode) AshGrey else Color.DarkGray).copy(0.7f))
                         }
                     }
@@ -562,9 +563,9 @@ class MainActivity : ComponentActivity() {
                     Spacer(Modifier.height(4.dp))
                     Text(
                         text = if (isEnglish)
-                            "Gemini API provides official Google responses using your key. Free AI provides fast answers directly without needing an API key."
+                            "Free public AI provides fast voice answers without needing an API key."
                         else
-                            "Gemini API utiliza tu clave de Google para respuestas avanzadas. La IA Gratuita contesta de forma ultra rápida sin requerir ninguna clave.",
+                            "La IA Gratuita pública contesta rápido por voz sin necesitar clave API.",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(0.85f)
                     )
@@ -580,7 +581,6 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun AiConfigDialog(onDismiss: () -> Unit, isEnglish: Boolean) {
-        var key by remember { mutableStateOf(repository.getGeminiApiKey()) }
         var aiEnabled by remember { mutableStateOf(repository.isAiEnabled()) }
         var geminiEnabled by remember { mutableStateOf(repository.isGeminiEngineEnabled()) }
         var freeAiEnabled by remember { mutableStateOf(repository.isFreeAiEngineEnabled()) }
@@ -593,7 +593,12 @@ class MainActivity : ComponentActivity() {
             containerColor = MaterialTheme.colorScheme.surface,
             title = { Text("CONFIGURACIÓN DE IA", color = com.example.demonitalk.ui.theme.DemoniPurple, fontWeight = FontWeight.Black) },
             text = {
-                Column {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 450.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
@@ -672,7 +677,6 @@ class MainActivity : ComponentActivity() {
             },
             confirmButton = { 
                 TextButton(
-                    enabled = !testing,
                     onClick = { 
                         repository.saveAiEnabled(aiEnabled)
                         repository.saveGeminiEngineEnabled(geminiEnabled)
@@ -697,7 +701,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 ) { 
-                    Text(if (testing) "PROBANDO..." else if (key.trim().isNotEmpty()) "PROBAR Y GUARDAR" else "GUARDAR", color = com.example.demonitalk.ui.theme.DemoniPurple, fontWeight = FontWeight.Bold) 
+                    Text("GUARDAR", color = com.example.demonitalk.ui.theme.DemoniPurple, fontWeight = FontWeight.Bold)
                 } 
             },
             dismissButton = { TextButton(onClick = onDismiss) { Text("CERRAR", color = AshGrey) } }

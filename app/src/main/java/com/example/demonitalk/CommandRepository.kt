@@ -12,7 +12,6 @@ class CommandRepository(private val context: Context) {
     private val COMMANDS_KEY = "commands"
     private val DARK_MODE_KEY = "dark_mode"
     private val EXPORT_PATH_KEY = "export_path"
-    private val GEMINI_API_KEY = "gemini_api_key"
     private val AI_ENABLED_KEY = "ai_enabled"
     private val EXECUTION_MODE_KEY = "execution_mode"
     private val GEMINI_ENGINE_ENABLED_KEY = "gemini_engine_enabled"
@@ -42,20 +41,55 @@ class CommandRepository(private val context: Context) {
         return prefs.getBoolean(FREE_AI_ENGINE_ENABLED_KEY, true)
     }
 
+    fun saveAiInstructions(instructions: String) {
+        prefs.edit { putString(AI_INSTRUCTIONS_KEY, instructions) }
+    }
+
+    fun getAiInstructions(): String {
+        return prefs.getString(AI_INSTRUCTIONS_KEY, "") ?: ""
+    }
+
+    fun saveAiMemory(memory: String) {
+        prefs.edit { putString(AI_MEMORY_KEY, memory) }
+    }
+
+    fun getAiMemory(): String {
+        return prefs.getString(AI_MEMORY_KEY, "") ?: ""
+    }
+
+    fun appendAiMemory(fact: String) {
+        val current = getAiMemory().trim()
+        val cleanFact = fact.trim().removePrefix("•").trim()
+        val newMemory = if (current.isEmpty()) {
+            "• $cleanFact"
+        } else {
+            "$current\n• $cleanFact"
+        }
+        saveAiMemory(newMemory)
+    }
+
+    fun saveExecutionMode(mode: String) {
+        prefs.edit { putString(EXECUTION_MODE_KEY, mode) }
+    }
+
+    fun getExecutionMode(): String {
+        return prefs.getString(EXECUTION_MODE_KEY, "HYBRID") ?: "HYBRID"
+    }
+
+    fun saveFreeAiEngineEnabled(enabled: Boolean) {
+        prefs.edit { putBoolean(FREE_AI_ENGINE_ENABLED_KEY, enabled) }
+    }
+
+    fun isFreeAiEngineEnabled(): Boolean {
+        return prefs.getBoolean(FREE_AI_ENGINE_ENABLED_KEY, true)
+    }
+
     fun saveAiEnabled(enabled: Boolean) {
         prefs.edit { putBoolean(AI_ENABLED_KEY, enabled) }
     }
 
     fun isAiEnabled(): Boolean {
         return prefs.getBoolean(AI_ENABLED_KEY, true)
-    }
-
-    fun saveGeminiApiKey(key: String) {
-        prefs.edit { putString(GEMINI_API_KEY, key) }
-    }
-
-    fun getGeminiApiKey(): String {
-        return prefs.getString(GEMINI_API_KEY, "") ?: ""
     }
 
     fun saveDarkMode(enabled: Boolean) {
