@@ -22,10 +22,12 @@ class SpeechRecognitionManager(
     private val onSpeechResults: (String) -> Unit,
     private val onErrorRestart: () -> Unit,
     private val onErrorStopWaiting: () -> Unit,
-    private val isModeActive: () -> Boolean
+    private val isModeActive: () -> Boolean,
+    private val onPartialSpeechResults: ((String) -> Boolean)? = null
 ) {
 
     private var speechRecognizer: SpeechRecognizer? = null
+    private var useOnDevice = true
     private val audioManager: AudioManager =
         context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val originalStreamVolumes = mutableMapOf<Int, Int>()
@@ -34,6 +36,7 @@ class SpeechRecognitionManager(
     private val streamsToMute = intArrayOf(
         AudioManager.STREAM_SYSTEM,
         AudioManager.STREAM_NOTIFICATION,
+        AudioManager.STREAM_RING,
         AudioManager.STREAM_ALARM,
         AudioManager.STREAM_DTMF,
         AudioManager.STREAM_ACCESSIBILITY
@@ -55,6 +58,9 @@ class SpeechRecognitionManager(
                     try {
                         audioManager.adjustStreamVolume(stream, AudioManager.ADJUST_MUTE, 0)
                     } catch (_: Exception) {
+                        try {
+                            audioManager.setStreamVolume(stream, 0, 0)
+                        } catch (_: Exception) {}
                     }
                 }
                 audioMutedByRecognizer = true
@@ -102,15 +108,8 @@ class SpeechRecognitionManager(
         }
 
         try {
-            speechRecognizer = if (
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                SpeechRecognizer.isOnDeviceRecognitionAvailable(context.applicationContext)
-            ) {
-                Log.i("SpeechRecManager", "Usando reconocedor de voz local para evitar pitidos del motor de Google")
-                SpeechRecognizer.createOnDeviceSpeechRecognizer(context.applicationContext)
-            } else {
-                SpeechRecognizer.createSpeechRecognizer(context.applicationContext)
-            }
+            Log.i("SpeechRecManager", "Usando reconocedor de voz estándar")
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context.applicationContext)
             speechRecognizer?.setRecognitionListener(speechListener)
         } catch (e: Exception) {
             Log.e("SpeechRecManager", "Error creando SpeechRecognizer: ${e.message}", e)
@@ -162,6 +161,10 @@ class SpeechRecognitionManager(
                 error == SpeechRecognizer.ERROR_SERVER ||
                 error == 12
             ) {
+                if (error == 12) {
+                    Log.w("SpeechRecManager", "Error 12 detectado: idioma local no disponible. Cambiando a reconocedor estándar.")
+                    useOnDevice = false
+                }
                 resetSpeechRecognizer()
             }
 
@@ -208,7 +211,13 @@ class SpeechRecognitionManager(
             }
         }
 
-        override fun onPartialResults(partialResults: Bundle?) {}
+        override fun onPartialResults(partialResults: Bundle?) {
+            val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+            if (!matches.isNullOrEmpty()) {
+                val text = matches[0]
+                onPartialSpeechResults?.invoke(text)
+            }
+        }
         override fun onEvent(eventType: Int, params: Bundle?) {}
     }
 
@@ -228,12 +237,20 @@ class SpeechRecognitionManager(
                 putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 10000L)
                 putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 3500L)
                 putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 3000)
                 putExtra("android.speech.extra.DICTATION_MODE", true)
             }
 
             muteAudio(true)
             speechRecognizer?.startListening(intent)
             isListening = true
+
+            // Restaurar audio tras600ms para que el pitido inicial pase totalmente desapercibido en silencio
+            mainHandler.postDelayed({
+                if (!isModeActive()) {
+                    restoreRecognitionAudio(force = true)
+                }
+            }, 600)
 
         } catch (e: Exception) {
             Log.e("SpeechRecManager", "Error al iniciar captura de voz: ${e.message}", e)
@@ -265,5 +282,23 @@ class SpeechRecognitionManager(
         resetSpeechRecognizer()
         restoreRecognitionAudio(force = true)
         mainHandler.removeCallbacksAndMessages(null)
+    }
+
+    // Pausa limpia para cuando habla el TTS
+    fun pauseListening() {
+        try {
+            speechRecognizer?.stopListening()
+        } catch (_: Exception) {}
+        isListening = false
+        restoreRecognitionAudio(force = true)
+        Log.d("SpeechRecManager", "Escucha pausada para evitar eco del TTS.")
+    }
+
+    // Reanuda la escucha si el modo sigue activo
+    fun resumeListening() {
+        if (!isListening && isModeActive()) {
+            Log.d("SpeechRecManager", "Reanudando escucha de voz.")
+            startListening()
+        }
     }
 }

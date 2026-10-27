@@ -92,10 +92,15 @@ class FloatingButtonService : Service() {
         createNotificationChannel()
         startForegroundService()
 
-        repository = CommandRepository(this)
-        aiAssistant = AiAssistant(this)
-        commandHandler = CommandHandler(this)
+        // 1. Primero creas el ttsManager (ya que lo necesita el asistente)
         ttsManager = TtsManager(this)
+
+// 2. Luego inicializas el AiAssistant pasándole el ttsManager
+        aiAssistant = AiAssistant(this, ttsManager)
+
+// 3. El resto de tus instancias
+        repository = CommandRepository(this)
+        commandHandler = CommandHandler(this)
 
         // UI Manager con callbacks de toques (1 a 5 toques)
         uiManager = FloatingUiManager(
@@ -378,11 +383,16 @@ class FloatingButtonService : Service() {
         val response = responses.random()
         updateButtonUI()
 
+        speechManager.stopListening()
         ttsManager.speakText(
             textToSpeak = response,
             onDoneCallback = {
                 if (!isServiceDestroyed) {
-                    startListening()
+                    mainHandler.postDelayed({
+                        if (!isServiceDestroyed) {
+                            startListening()
+                        }
+                    }, 1500)
                 }
             }
         )
@@ -392,10 +402,15 @@ class FloatingButtonService : Service() {
         if (isServiceDestroyed) return
 
         if (!aiAssistant.isAiAvailable()) {
+            speechManager.stopListening()
             ttsManager.speakText("La IA está desactivada o sin motor configurado.") {
                 isWaitingForCommandAfterWake = false
                 if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) {
-                    scheduleListeningRestart(500)
+                    mainHandler.postDelayed({
+                        if (!isServiceDestroyed) {
+                            scheduleListeningRestart(1500)
+                        }
+                    }, 1500)
                 } else {
                     updateButtonUI()
                 }
@@ -412,10 +427,15 @@ class FloatingButtonService : Service() {
 
                 withContext(Dispatchers.Main) {
                     if (finalSpeech.isNotEmpty()) {
+                        speechManager.stopListening()
                         ttsManager.speakText(finalSpeech) {
                             isWaitingForCommandAfterWake = false
                             if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) {
-                                startListening()
+                                mainHandler.postDelayed({
+                                    if (!isServiceDestroyed) {
+                                        startListening()
+                                    }
+                                }, 1500)
                             } else {
                                 updateButtonUI()
                             }
@@ -423,7 +443,11 @@ class FloatingButtonService : Service() {
                     } else {
                         isWaitingForCommandAfterWake = false
                         if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) {
-                            startListening()
+                            mainHandler.postDelayed({
+                                if (!isServiceDestroyed) {
+                                    startListening()
+                                }
+                            }, 1500)
                         } else {
                             updateButtonUI()
                         }
@@ -432,13 +456,11 @@ class FloatingButtonService : Service() {
             } else {
                 Log.w("FloatingButtonService", "Sin respuesta de IA o fallo de conexión.")
                 withContext(Dispatchers.Main) {
-                    ttsManager.speakText("No pude obtener respuesta de la IA en este momento.") {
-                        isWaitingForCommandAfterWake = false
-                        if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) {
-                            scheduleListeningRestart(500)
-                        } else {
-                            updateButtonUI()
-                        }
+                    isWaitingForCommandAfterWake = false
+                    if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) {
+                        scheduleListeningRestart(500)
+                    } else {
+                        updateButtonUI()
                     }
                 }
             }
