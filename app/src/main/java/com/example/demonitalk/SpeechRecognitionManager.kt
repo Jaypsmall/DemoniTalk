@@ -12,6 +12,9 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
+import org.vosk.Model
+import org.vosk.Recognizer
+import org.vosk.android.SpeechService
 
 class SpeechRecognitionManager(
     private val context: Context,

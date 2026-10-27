@@ -12,8 +12,6 @@ import android.os.Looper
 import android.provider.Settings
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.google.gson.Gson
-import com.google.gson.JsonObject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -58,6 +56,7 @@ class FloatingButtonService : Service() {
                 updateButtonUI()
                 startListening()
             }
+
             "ACTION_MODE_BLUE" -> {
                 stopPendingRestart()
                 isContinuousMode = false
@@ -66,6 +65,7 @@ class FloatingButtonService : Service() {
                 updateButtonUI()
                 startListening()
             }
+
             "ACTION_MODE_GREEN" -> {
                 stopPendingRestart()
                 isContinuousMode = true
@@ -74,6 +74,7 @@ class FloatingButtonService : Service() {
                 updateButtonUI()
                 startListening()
             }
+
             "ACTION_MODE_RED" -> stopEverything()
             "ACTION_STOP_SERVICE" -> {
                 stopEverything()
@@ -171,6 +172,7 @@ class FloatingButtonService : Service() {
                         updateButtonUI()
                         startListening()
                     }
+
                     "internal_mode_blue", "internal_vigilance_on" -> {
                         stopPendingRestart()
                         isContinuousMode = false
@@ -179,6 +181,7 @@ class FloatingButtonService : Service() {
                         updateButtonUI()
                         startListening()
                     }
+
                     "internal_mode_yellow" -> {
                         stopPendingRestart()
                         isContinuousMode = false
@@ -196,39 +199,115 @@ class FloatingButtonService : Service() {
         }
     }
 
-    private fun handleSpeechResults(text: String) {
-        val lowerText = text.lowercase(Locale.getDefault())
+    private fun cleanPromptForAi(text: String): String {
+        var result = text.trim()
+        val wakeWords = listOf("demonio", "demoni", "hermano", "amigo", "maquina")
+        for (w in wakeWords) {
+            if (result.startsWith("$w ")) {
+                result = result.removePrefix("$w ").trim()
+            }
+            if (result.endsWith(" $w")) {
+                result = result.removeSuffix(" $w").trim()
+            }
+            if (result == w) {
+                result = ""
+            }
+        }
+        return result
+    }
 
-        try {
-            val result = commandHandler.execute(
+    private fun handlePartialSpeechResults(text: String): Boolean {
+        if (text.isBlank()) return false
+        val clean = text.lowercase(Locale.getDefault()).trim()
+
+        if (clean.startsWith("escribe ") ||
+            clean.startsWith("manda este mensaje ") ||
+            clean.startsWith("reproduce ") ||
+            clean.startsWith("pon ") ||
+            clean.startsWith("busca ") ||
+            clean.startsWith("buscar ")
+        ) {
+            return false
+        }
+
+        val result = try {
+            commandHandler.execute(
                 text,
                 repository.loadCommands(),
                 isVigilanceMode && !isWaitingForCommandAfterWake
             )
+        } catch (e: Exception) {
+            Log.e("FloatingButtonService", "Error ejecutando comando parcial: ${e.message}", e)
+            CommandHandler.CommandResult.Ignored
+        }
 
-            if (isWaitingForCommandAfterWake) {
-                isWaitingForCommandAfterWake = false
-                isVigilanceMode = false
-            } else if (isVigilanceMode && result == CommandHandler.CommandResult.WakeWordOnly) {
-                handleWakeWordResponse()
-                return
-            } else if (result == CommandHandler.CommandResult.Ignored) {
-                if (lowerText.isNotEmpty() && aiAssistant.isAiAvailable()) {
-                    processWithAiAndSpeak(lowerText)
-                    return
+        if (result == CommandHandler.CommandResult.Executed) {
+            mainHandler.post {
+                if (isWaitingForCommandAfterWake) {
+                    isWaitingForCommandAfterWake = false
+                    isVigilanceMode = false
+                }
+                if (isContinuousMode || isVigilanceMode) {
+                    scheduleListeningRestart(500)
+                } else {
+                    updateButtonUI()
                 }
             }
-        } catch (e: Exception) {
-            Log.e("FloatingButtonService", "Error ejecutando comando: ${e.message}", e)
+            return true
+        } else if (isVigilanceMode && !isWaitingForCommandAfterWake && result == CommandHandler.CommandResult.WakeWordOnly) {
+            mainHandler.post { handleWakeWordResponse() }
+            return true
         }
 
-        isWaitingForCommandAfterWake = false
+        return false
+    }
 
-        if (isContinuousMode || isVigilanceMode) {
-            scheduleListeningRestart(500)
-        } else {
-            updateButtonUI()
+    private fun handleSpeechResults(text: String) {
+        CoroutineScope(Dispatchers.Default).launch {
+            val lowerText = text.lowercase(Locale.getDefault())
+
+            val result = try {
+                commandHandler.execute(
+                    text,
+                    repository.loadCommands(),
+                    isVigilanceMode && !isWaitingForCommandAfterWake,
+                )
+            } catch (e: Exception) {
+                Log.e("FloatingButtonService", "Error ejecutando comando: ${e.message}", e)
+                CommandHandler.CommandResult.Ignored
+            }
+
+            withContext(Dispatchers.Main) {
+                if (isWaitingForCommandAfterWake) {
+                    isWaitingForCommandAfterWake = false
+                    isVigilanceMode = false
+                } else if (isVigilanceMode && result == CommandHandler.CommandResult.WakeWordOnly) {
+                    handleWakeWordResponse()
+                    return@withContext
+                } else if (result == CommandHandler.CommandResult.Ignored) {
+                    val promptForAi = cleanPromptForAi(lowerText)
+                    if (promptForAi.isNotEmpty() && aiAssistant.isAiAvailable()) {
+                        processWithAiAndSpeak(promptForAi)
+                        return@withContext
+                    }
+                }
+
+                isWaitingForCommandAfterWake = false
+
+                if (isContinuousMode || isVigilanceMode) {
+                    scheduleListeningRestart(500)
+                } else {
+                    updateButtonUI()
+                }
+            }
         }
+    }
+
+    private fun CommandHandler.execute(
+        text: String,
+        commands: kotlin.collections.List<com.example.demonitalk.VoiceCommand>,
+        requireWakeWord: Boolean
+    ) {
     }
 
     private fun startListening() {
@@ -328,60 +407,20 @@ class FloatingButtonService : Service() {
             val aiReply = aiAssistant.askFreeAi(prompt)
 
             if (!aiReply.isNullOrBlank()) {
-                var rawSpeech = aiReply
+                val cleanSpeech = ttsManager.cleanTextForSpeech(aiReply)
+                val finalSpeech = if (cleanSpeech.isNotEmpty()) cleanSpeech else ""
 
-                try {
-                    val gson = Gson()
-                    val cleanJsonStr = aiReply.substringOrDefault("{", "}").ifEmpty { aiReply }
-                    val jsonObject = gson.fromJson(cleanJsonStr, JsonObject::class.java)
-
-                    if (jsonObject != null && jsonObject.has("reply")) {
-                        rawSpeech = jsonObject.get("reply")?.asString ?: ""
-
-                        if (jsonObject.has("commands") && jsonObject.get("commands").isJsonArray) {
-                            val cmdsArray = jsonObject.getAsJsonArray("commands")
-                            val cmdList = mutableListOf<String>()
-                            for (i in 0 until cmdsArray.size()) {
-                                val cmd = cmdsArray.get(i).asString
-                                if (cmd.startsWith("remember:", ignoreCase = true)) {
-                                    val fact = cmd.removePrefix("remember:").trim()
-                                    if (fact.isNotEmpty()) repository.appendAiMemory(fact)
-                                } else {
-                                    cmdList.add(cmd)
-                                }
-                            }
-                            if (cmdList.isNotEmpty()) {
-                                val joinedCmds = cmdList.joinToString("; ")
-                                Log.d("FloatingButtonService", "Ejecutando secuencia JSON de la IA: $joinedCmds")
-                                commandHandler.execute(joinedCmds, repository.loadCommands(), false)
+                withContext(Dispatchers.Main) {
+                    if (finalSpeech.isNotEmpty()) {
+                        ttsManager.speakText(finalSpeech) {
+                            isWaitingForCommandAfterWake = false
+                            if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) {
+                                startListening()
+                            } else {
+                                updateButtonUI()
                             }
                         }
                     } else {
-                        rawSpeech = aiReply
-                    }
-                } catch (e: Exception) {
-                    rawSpeech = aiReply
-
-                    val cmdRegex = Regex("""\[CMD:(.+?)]""", RegexOption.IGNORE_CASE)
-                    val matchCmd = cmdRegex.find(aiReply)
-                    if (matchCmd != null) {
-                        val commandAction = matchCmd.groupValues[1].trim()
-                        commandHandler.execute(commandAction, repository.loadCommands(), false)
-                    }
-
-                    val remRegex = Regex("""\[REMEMBER:(.+?)]""", RegexOption.IGNORE_CASE)
-                    val matchRem = remRegex.find(aiReply)
-                    if (matchRem != null) {
-                        val factToSave = matchRem.groupValues[1].trim()
-                        if (factToSave.isNotEmpty()) repository.appendAiMemory(factToSave)
-                    }
-                }
-
-                val cleanSpeech = ttsManager.cleanTextForSpeech(rawSpeech)
-                val finalSpeech = if (cleanSpeech.isNotEmpty()) cleanSpeech else "Entendido."
-
-                withContext(Dispatchers.Main) {
-                    ttsManager.speakText(finalSpeech) {
                         isWaitingForCommandAfterWake = false
                         if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) {
                             startListening()
@@ -439,13 +478,11 @@ class FloatingButtonService : Service() {
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    startForeground(
-                        notificationId,
-                        notification,
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-                    )
-                }
+                startForeground(
+                    notificationId,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                )
             } else {
                 startForeground(notificationId, notification)
             }
@@ -462,878 +499,9 @@ class FloatingButtonService : Service() {
         isVigilanceMode = false
         isWaitingForCommandAfterWake = false
 
-            val manager =
-                getSystemService(
-                    NotificationManager::class.java
-                )
-
-            manager.createNotificationChannel(serviceChannel)
-        }
-    }
-
-    private fun startForegroundService() {
-
-        val notification =
-            NotificationCompat.Builder(
-                this,
-                channelId
-            )
-                .setSmallIcon(R.drawable.icono_demoni2)
-                .setContentTitle("DemoniTalk Activo")
-                .setContentText("Escuchando comandos de voz...")
-                .setSilent(true)
-                .setOngoing(true)
-                .setPriority(NotificationCompat.PRIORITY_MIN)
-                .build()
-
-        try {
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-
-                startForeground(
-                    notificationId,
-                    notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-                )
-
-            } else {
-
-                startForeground(
-                    notificationId,
-                    notification
-                )
-            }
-
-            Log.d(
-                "DemoniTalk",
-                "Foreground Service iniciado correctamente"
-            )
-
-        } catch (e: Exception) {
-
-            Log.e(
-                "DemoniTalk",
-                "Error al iniciar Foreground Service: ${e.message}",
-                e
-            )
-        }
-    }
-
-    private fun muteAudio(mute: Boolean) {
-        try {
-            val notificationManager = getSystemService(NOTIFICATION_SERVICE) as? android.app.NotificationManager
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                if (notificationManager != null && !notificationManager.isNotificationPolicyAccessGranted) {
-                    return
-                }
-            }
-
-            if (mute) {
-                if (originalSystemVolume == -1) {
-                    originalSystemVolume = audioManager.getStreamVolume(AudioManager.STREAM_SYSTEM)
-                }
-                audioManager.setStreamVolume(AudioManager.STREAM_SYSTEM, 0, 0)
-            } else {
-                if (originalSystemVolume != -1) {
-                    val volumeToRestore = originalSystemVolume
-                    originalSystemVolume = -1
-                    mainHandler.postDelayed({
-                        if (!isServiceDestroyed) {
-                            try {
-                                audioManager.setStreamVolume(AudioManager.STREAM_SYSTEM, volumeToRestore, 0)
-                            } catch (e: Exception) {
-                                Log.d("DemoniTalk", "No se pudo restaurar volumen: ${e.message}")
-                            }
-                        }
-                    }, 600)
-                }
-            }
-        } catch (e: SecurityException) {
-            Log.d("DemoniTalk", "Permiso de política de notificaciones no otorgado para cambiar volumen DND: ${e.message}")
-        } catch (e: Exception) {
-            Log.d("DemoniTalk", "Error gestionando audio: ${e.message}")
-        }
-    }
-
-    private fun setupSpeechRecognizer() {
-
-        if (speechRecognizer != null) return
-
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-
-            Log.e(
-                "DemoniTalk",
-                "Speech Recognition no disponible en este dispositivo"
-            )
-
-            return
-        }
-
-        try {
-
-            Log.d(
-                "DemoniTalk",
-                "Configurando SpeechRecognizer..."
-            )
-
-            speechRecognizer =
-                SpeechRecognizer.createSpeechRecognizer(
-                    applicationContext
-                )
-
-            speechRecognizer?.setRecognitionListener(
-                speechListener
-            )
-
-        } catch (e: Exception) {
-
-            Log.e(
-                "DemoniTalk",
-                "Error creando SpeechRecognizer: ${e.message}",
-                e
-            )
-
-            speechRecognizer = null
-        }
-    }
-
-    private val speechListener =
-        object : RecognitionListener {
-
-            override fun onReadyForSpeech(
-                params: Bundle?
-            ) {
-
-                Log.d(
-                    "DemoniTalk",
-                    ">>> RECOGNIZER READY: ¡Habla ahora! <<<"
-                )
-
-                isListening = true
-
-                updateButtonUI()
-            }
-
-            override fun onBeginningOfSpeech() {
-
-                Log.d(
-                    "DemoniTalk",
-                    ">>> EMPEZÓ A HABLAR <<<"
-                )
-            }
-
-            override fun onRmsChanged(
-                rmsdB: Float
-            ) {
-            }
-
-            override fun onBufferReceived(
-                buffer: ByteArray?
-            ) {
-            }
-
-            override fun onEndOfSpeech() {
-
-                Log.d(
-                    "DemoniTalk",
-                    ">>> FIN DE VOZ DETECTADO <<<"
-                )
-
-                isListening = false
-
-                muteAudio(true)
-            }
-
-            @SuppressLint("SwitchIntDef")
-            override fun onError(
-                error: Int
-            ) {
-
-                val message =
-                    when (error) {
-
-                        SpeechRecognizer.ERROR_AUDIO ->
-                            "Error de audio"
-
-                        SpeechRecognizer.ERROR_CLIENT ->
-                            "Error del cliente"
-
-                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS ->
-                            "Permisos insuficientes"
-
-                        SpeechRecognizer.ERROR_NETWORK ->
-                            "Error de red"
-
-                        SpeechRecognizer.ERROR_NETWORK_TIMEOUT ->
-                            "Tiempo de espera de red agotado"
-
-                        SpeechRecognizer.ERROR_NO_MATCH ->
-                            "No se encontró coincidencia"
-
-                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY ->
-                            "Reconocedor ocupado"
-
-                        SpeechRecognizer.ERROR_SERVER ->
-                            "Error del servidor"
-
-                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT ->
-                            "No se detectó voz"
-
-                        12 ->
-                            "Idioma no soportado (Error 12)"
-
-                        else ->
-                            "Error desconocido: $error"
-                    }
-
-                Log.e(
-                    "DemoniTalk",
-                    "!!! ERROR RECONOCIMIENTO [$error]: $message !!!"
-                )
-
-                isListening = false
-
-                muteAudio(false)
-
-                /*
-                 * Reconstruimos el reconocedor cuando queda
-                 * en un estado potencialmente bloqueado.
-                 */
-                if (
-                    error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ||
-                    error == SpeechRecognizer.ERROR_CLIENT ||
-                    error == SpeechRecognizer.ERROR_SERVER ||
-                    error == 12
-                ) {
-                    resetSpeechRecognizer()
-                }
-
-                /*
-                 * Conservamos la recuperación ROOT que ya tenía
-                 * DemoniTalk, pero sin ejecutar comandos desde
-                 * el hilo principal.
-                 */
-                if (
-                    error ==
-                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS ||
-                    error ==
-                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY
-                ) {
-
-                    if (ShellUtils.isRootAvailable()) {
-
-                        Log.w(
-                            "DemoniTalk",
-                            "Error crítico detectado. Intentando recuperación por ROOT..."
-                        )
-
-                        Thread {
-
-                            try {
-
-                                ShellUtils.executeCommand(
-                                    "appops set $packageName RECORD_AUDIO allow"
-                                )
-
-                                ShellUtils.executeCommand(
-                                    "appops set $packageName PROJECT_MEDIA allow"
-                                )
-
-                                if (
-                                    error ==
-                                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY
-                                ) {
-
-                                    ShellUtils.executeCommand(
-                                        "am force-stop com.google.android.googlequicksearchbox"
-                                    )
-                                }
-
-                            } catch (e: Exception) {
-
-                                Log.e(
-                                    "DemoniTalk",
-                                    "Error en recuperación ROOT: ${e.message}"
-                                )
-                            }
-
-                        }.start()
-
-                    } else {
-
-                        Log.e(
-                            "DemoniTalk",
-                            "No hay ROOT disponible para recuperación del reconocimiento"
-                        )
-                    }
-                }
-
-                if (
-                    isContinuousMode ||
-                    isVigilanceMode
-                ) {
-
-                    scheduleListeningRestart(2000)
-
-                } else {
-
-                    isWaitingForCommandAfterWake = false
-                    updateButtonUI()
-                }
-            }
-
-            override fun onResults(
-                results: Bundle?
-            ) {
-
-                isListening = false
-
-                muteAudio(false)
-
-                val matches =
-                    results?.getStringArrayList(
-                        SpeechRecognizer.RESULTS_RECOGNITION
-                    )
-
-                Log.d(
-                    "DemoniTalk",
-                    "Resultados obtenidos: $matches"
-                )
-
-                if (!matches.isNullOrEmpty()) {
-
-                    val text = matches[0]
-
-                    Log.i(
-                        "DemoniTalk",
-                        "Texto reconocido: $text"
-                    )
-
-                    try {
-
-                        val result =
-                            commandHandler.execute(
-                                text,
-                                repository.loadCommands(),
-                                isVigilanceMode &&
-                                        !isWaitingForCommandAfterWake
-                            )
-
-                        val lowerText = text.lowercase(Locale.getDefault())
-
-                        /*
-                         * Modo amarillo:
-                         * una frase reconocida = comando.
-                         */
-                        if (isWaitingForCommandAfterWake) {
-
-                            isWaitingForCommandAfterWake = false
-                            isVigilanceMode = false
-
-                        } else if (
-                            isVigilanceMode &&
-                            result ==
-                            CommandHandler.CommandResult.WakeWordOnly
-                        ) {
-
-                            Log.d(
-                                "DemoniTalk",
-                                "Wake word detectado, esperando comando..."
-                            )
-
-                            handleWakeWordResponse()
-
-                            return
-                        } else if (
-                            result == CommandHandler.CommandResult.Ignored
-                        ) {
-
-                            val cleanPrompt = lowerText
-                                .replace(Regex("""\bdemoni\b"""), "")
-                                .replace(Regex("""\bdemonio\b"""), "")
-                                .trim()
-
-                            val promptToSend = if (cleanPrompt.isNotEmpty()) cleanPrompt else lowerText
-
-                            if (promptToSend.isNotEmpty() && aiAssistant.isAiAvailable()) {
-                                Log.d(
-                                    "DemoniTalk",
-                                    "Comando no reconocido localmente. Procesando con IA: $promptToSend"
-                                )
-
-                                processWithAiAndSpeak(promptToSend)
-
-                                return
-                            }
-                        }
-
-                    } catch (e: Exception) {
-
-                        Log.e(
-                            "DemoniTalk",
-                            "Error ejecutando comando: ${e.message}",
-                            e
-                        )
-                    }
-                }
-
-                isWaitingForCommandAfterWake = false
-
-                if (
-                    isContinuousMode ||
-                    isVigilanceMode
-                ) {
-
-                    scheduleListeningRestart(500)
-
-                } else {
-
-                    updateButtonUI()
-                }
-            }
-
-            override fun onPartialResults(
-                partialResults: Bundle?
-            ) {
-
-                val partial =
-                    partialResults?.getStringArrayList(
-                        SpeechRecognizer.RESULTS_RECOGNITION
-                    )
-
-                if (!partial.isNullOrEmpty()) {
-
-                    Log.v(
-                        "DemoniTalk",
-                        "Resultado parcial: ${partial[0]}"
-                    )
-                }
-            }
-
-            override fun onEvent(
-                eventType: Int,
-                params: Bundle?
-            ) {
-            }
-        }
-
-    private fun startListening() {
-
-        if (isServiceDestroyed) return
-
-        mainHandler.post {
-
-            if (isServiceDestroyed) return@post
-
-            /*
-             * Cancelamos cualquier reinicio pendiente.
-             */
-            stopPendingRestart()
-
-            /*
-             * Si ya estaba escuchando, no creamos otra sesión.
-             */
-            if (isListening) {
-
-                Log.w(
-                    "DemoniTalk",
-                    "startListening() llamado mientras ya estaba escuchando"
-                )
-
-                return@post
-            }
-
-            try {
-
-                setupSpeechRecognizer()
-
-                if (speechRecognizer == null) {
-
-                    Log.e(
-                        "DemoniTalk",
-                        "SpeechRecognizer es NULL"
-                    )
-
-                    return@post
-                }
-
-                /*
-                 * Limpiamos una sesión anterior.
-                 */
-                try {
-                    speechRecognizer?.cancel()
-                } catch (_: Exception) {
-                }
-
-                val intent =
-                    Intent(
-                        RecognizerIntent.ACTION_RECOGNIZE_SPEECH
-                    ).apply {
-
-                        putExtra(
-                            RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
-                        )
-
-                        // Probamos con un tag de idioma más genérico
-                        putExtra(
-                            RecognizerIntent.EXTRA_LANGUAGE,
-                            "es"
-                        )
-
-                        putExtra(
-                            RecognizerIntent.EXTRA_CALLING_PACKAGE,
-                            packageName
-                        )
-                    }
-
-                Log.d(
-                    "DemoniTalk",
-                    ">>> LLAMANDO A startListening() <<<"
-                )
-
-                muteAudio(true)
-
-                speechRecognizer?.startListening(intent)
-
-                isListening = true
-
-            } catch (e: Exception) {
-
-                Log.e(
-                    "DemoniTalk",
-                    "Error al iniciar captura de voz: ${e.message}",
-                    e
-                )
-
-                isListening = false
-
-                muteAudio(false)
-
-                if (
-                    isContinuousMode ||
-                    isVigilanceMode
-                ) {
-                    scheduleListeningRestart(2000)
-                }
-            }
-        }
-    }
-
-    private fun scheduleListeningRestart(
-        delay: Long
-    ) {
-
-        if (isServiceDestroyed) return
-
-        stopPendingRestart()
-
-        restartRunnable =
-            Runnable {
-
-                restartRunnable = null
-
-                if (
-                    !isServiceDestroyed &&
-                    (isContinuousMode || isVigilanceMode) &&
-                    !isListening
-                ) {
-
-                    startListening()
-                }
-            }
-
-        mainHandler.postDelayed(
-            restartRunnable!!,
-            delay
-        )
-    }
-
-    private fun stopPendingRestart() {
-
-        restartRunnable?.let {
-            mainHandler.removeCallbacks(it)
-        }
-
-        restartRunnable = null
-    }
-
-    private fun resetSpeechRecognizer() {
-
-        try {
-            speechRecognizer?.cancel()
-        } catch (_: Exception) {
-        }
-
-        try {
-            speechRecognizer?.destroy()
-        } catch (_: Exception) {
-        }
-
-        speechRecognizer = null
-        isListening = false
-    }
-
-    private fun handleWakeWordResponse() {
-
-        if (isServiceDestroyed) return
-
-        isWaitingForCommandAfterWake = true
-
-        val responses =
-            listOf(
-                "¿Abrimos el Super?",
-                "Que dice mi socio",
-                "Dime",
-                "como esta la cosa Bro",
-                "Soy todo oídos",
-                "Que dice mi Amo",
-                "¿Necesitas algo?",
-                "¿Qué sacrificio pides?",
-                "Tus deseos son órdenes",
-                "Habla",
-                "Te escucho",
-                "¿Qué hay?",
-                "Ordena"
-            )
-
-        val response =
-            responses.random()
-
-        updateButtonUI()
-
-        /*
-         * Si TTS todavía no está listo, simplemente
-         * continuamos escuchando.
-         */
-        if (!isTtsReady) {
-
-            Log.w(
-                "DemoniTalk",
-                "TTS todavía no está preparado"
-            )
-
-            startListening()
-            return
-        }
-
-        tts.setOnUtteranceProgressListener(
-            object : UtteranceProgressListener() {
-
-                override fun onStart(
-                    id: String?
-                ) {
-                    isListening = false
-                }
-
-                override fun onDone(
-                    id: String?
-                ) {
-
-                    mainHandler.post {
-
-                        if (!isServiceDestroyed) {
-                            startListening()
-                        }
-                    }
-                }
-
-                @Deprecated("Deprecated in Java")
-                override fun onError(
-                    id: String?
-                ) {
-
-                    mainHandler.post {
-
-                        if (!isServiceDestroyed) {
-                            startListening()
-                        }
-                    }
-                }
-            }
-        )
-
-        try {
-
-            tts.speak(
-                response,
-                TextToSpeech.QUEUE_FLUSH,
-                null,
-                "DemoniWake"
-            )
-
-        } catch (e: Exception) {
-
-            Log.e(
-                "DemoniTalk",
-                "Error ejecutando TTS: ${e.message}"
-            )
-
-            startListening()
-        }
-    }
-
-    private fun speakText(textToSpeak: String, onDoneCallback: (() -> Unit)? = null) {
-        if (!isTtsReady) {
-            onDoneCallback?.invoke()
-            return
-        }
-
-        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(id: String?) {
-                isListening = false
-            }
-
-            override fun onDone(id: String?) {
-                mainHandler.post {
-                    onDoneCallback?.invoke()
-                }
-            }
-
-            @Deprecated("Deprecated in Java")
-            override fun onError(id: String?) {
-                mainHandler.post {
-                    onDoneCallback?.invoke()
-                }
-            }
-        })
-
-        try {
-            tts.speak(
-                textToSpeak,
-                TextToSpeech.QUEUE_FLUSH,
-                null,
-                "DemoniSpeech_${System.currentTimeMillis()}"
-            )
-        } catch (e: Exception) {
-            Log.e("DemoniTalk", "Error ejecutando TTS: ${e.message}")
-            onDoneCallback?.invoke()
-        }
-    }
-
-    private fun removeEmojis(text: String): String {
-        return text
-            .replace(Regex("""[\uD83C-\uDBFF\uDC00-\uDFFF\u2600-\u27BF\u1F300-\u1F9FF]"""), "")
-            .replace(Regex("""[🚀😈🤖⚡🔥✨👍]"""), "")
-            .trim()
-    }
-
-    private fun processWithAiAndSpeak(prompt: String) {
-        if (isServiceDestroyed) return
-
-        if (!aiAssistant.isAiAvailable()) {
-            Log.w("DemoniTalk", "IA no está disponible o no hay motores activos.")
-            isWaitingForCommandAfterWake = false
-            if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) {
-                scheduleListeningRestart(500)
-            } else {
-                updateButtonUI()
-            }
-            return
-        }
-
-        CoroutineScope(Dispatchers.Main).launch {
-            val aiReply = aiAssistant.askGemini(prompt)
-            if (!aiReply.isNullOrEmpty()) {
-                val cleanReply = removeEmojis(aiReply)
-
-                // Verificamos si la IA incluyó una orden/accion interpretada [CMD:accion]
-                val cmdRegex = Regex("""\[CMD:(.+?)]""", RegexOption.IGNORE_CASE)
-                val match = cmdRegex.find(cleanReply)
-
-                if (match != null) {
-                    val commandAction = match.groupValues[1].trim()
-                    val speechText = cleanReply.replace(cmdRegex, "").trim()
-
-                    Log.d("DemoniTalk", "IA ejecutando comando coloquial: $commandAction")
-                    commandHandler.execute(commandAction, repository.loadCommands(), false)
-
-                    if (speechText.isNotEmpty()) {
-                        speakText(speechText) {
-                            isWaitingForCommandAfterWake = false
-                            if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) {
-                                startListening()
-                            } else {
-                                updateButtonUI()
-                            }
-                        }
-                    } else {
-                        isWaitingForCommandAfterWake = false
-                        if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) {
-                            startListening()
-                        } else {
-                            updateButtonUI()
-                        }
-                    }
-                } else {
-                    speakText(cleanReply) {
-                        isWaitingForCommandAfterWake = false
-                        if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) {
-                            startListening()
-                        } else {
-                            updateButtonUI()
-                        }
-                    }
-                }
-            } else {
-                Log.w("DemoniTalk", "Sin respuesta de IA o fallo de conexión. Silencio.")
-                isWaitingForCommandAfterWake = false
-                if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) {
-                    scheduleListeningRestart(500)
-                } else {
-                    updateButtonUI()
-                }
-            }
-        }
-    }
-
-    override fun onDestroy() {
-
-        isServiceDestroyed = true
-
-        stopPendingRestart()
-
-        isContinuousMode = false
-        isVigilanceMode = false
-        isListening = false
-        isWaitingForCommandAfterWake = false
-
-        muteAudio(false)
-
-        try {
-            speechRecognizer?.cancel()
-        } catch (_: Exception) {
-        }
-
-        try {
-            speechRecognizer?.destroy()
-        } catch (_: Exception) {
-        }
-
-        speechRecognizer = null
-
-        if (::tts.isInitialized) {
-
-            try {
-                tts.stop()
-            } catch (_: Exception) {
-            }
-
-            try {
-                tts.shutdown()
-            } catch (_: Exception) {
-            }
-        }
-
-        floatingView?.let {
-
-            try {
-                windowManager.removeView(it)
-            } catch (_: Exception) {
-            }
-        }
-
-        floatingView = null
+        if (::speechManager.isInitialized) speechManager.destroy()
+        if (::ttsManager.isInitialized) ttsManager.destroy()
+        if (::uiManager.isInitialized) uiManager.destroy()
 
         mainHandler.removeCallbacksAndMessages(null)
         super.onDestroy()

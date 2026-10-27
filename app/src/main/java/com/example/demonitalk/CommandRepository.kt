@@ -16,6 +16,8 @@ class CommandRepository(private val context: Context) {
     private val EXECUTION_MODE_KEY = "execution_mode"
     private val GEMINI_ENGINE_ENABLED_KEY = "gemini_engine_enabled"
     private val FREE_AI_ENGINE_ENABLED_KEY = "free_ai_engine_enabled"
+    private val AI_INSTRUCTIONS_KEY = "ai_instructions"
+    private val AI_MEMORY_KEY = "ai_memory"
 
     fun saveExecutionMode(mode: String) {
         prefs.edit { putString(EXECUTION_MODE_KEY, mode) }
@@ -66,22 +68,6 @@ class CommandRepository(private val context: Context) {
             "$current\n• $cleanFact"
         }
         saveAiMemory(newMemory)
-    }
-
-    fun saveExecutionMode(mode: String) {
-        prefs.edit { putString(EXECUTION_MODE_KEY, mode) }
-    }
-
-    fun getExecutionMode(): String {
-        return prefs.getString(EXECUTION_MODE_KEY, "HYBRID") ?: "HYBRID"
-    }
-
-    fun saveFreeAiEngineEnabled(enabled: Boolean) {
-        prefs.edit { putBoolean(FREE_AI_ENGINE_ENABLED_KEY, enabled) }
-    }
-
-    fun isFreeAiEngineEnabled(): Boolean {
-        return prefs.getBoolean(FREE_AI_ENGINE_ENABLED_KEY, true)
     }
 
     fun saveAiEnabled(enabled: Boolean) {

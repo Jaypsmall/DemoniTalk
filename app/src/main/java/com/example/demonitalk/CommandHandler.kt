@@ -5,6 +5,7 @@ import android.util.Log
 import java.text.Normalizer
 import java.util.Locale
 import java.util.regex.Pattern
+import kotlin.math.abs
 
 class CommandHandler(private val context: Context) {
 
@@ -520,7 +521,7 @@ class CommandHandler(private val context: Context) {
             return false
         }
         // Si el texto completo es mucho más largo que el disparador, no es una coincidencia directa
-        if (Math.abs(text.length - trigger.length) > 5) {
+        if (abs(text.length - trigger.length) > 5) {
             return false
         }
 
