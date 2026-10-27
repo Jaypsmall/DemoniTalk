@@ -3,6 +3,9 @@
 
 ## 😈 DemoniTalk — AI, Root & Accessibility Voice Automation Engine
     
+
+<a href="https://github.com/Jaypsmall/DemoniTalk/releases/download/demoni/DemoniTalk_v2.0.2_AI.apk">
+  <img src="https://img.shields.io/badge/DOWNLOAD_DEMONITALK_v2.0.2_AI_APK-181717?style=flat&logo=android&logoColor=FF8B3D" alt="Download AI Release">    
 <a href="https://github.com/Jaypsmall/DemoniTalk/releases/download/demoni/DemoniTalk_v2.0.1_AI.apk">
   <img src="https://img.shields.io/badge/DOWNLOAD_DEMONITALK_v2.0.1_AI_APK-181717?style=flat&logo=android&logoColor=FF8B3D" alt="Download AI Release">
 <a href="https://github.com/Jaypsmall/DemoniTalk/releases/download/root/DemoniTalk_v1.0.3.apk">
