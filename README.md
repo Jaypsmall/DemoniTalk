@@ -1,5 +1,5 @@
 
-# 😈 DemoniTalk (v2.0.1 - DemonicAI Edition)   ![Android](https://img.shields.io/badge/Android-181717?style=flat&logo=android&logoColor=FF8B3D) ![Kotlin](https://img.shields.io/badge/kotlin-181717?style=flat&logo=kotlin&logoColor=FF8B3D) 
+# 😈 DemoniTalk (v2.0.2 - DemonicAI Edition)   ![Android](https://img.shields.io/badge/Android-181717?style=flat&logo=android&logoColor=FF8B3D) ![Kotlin](https://img.shields.io/badge/kotlin-181717?style=flat&logo=kotlin&logoColor=FF8B3D) 
 
 ## 😈 DemoniTalk — AI, Root & Accessibility Voice Automation Engine
     
