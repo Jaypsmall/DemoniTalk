@@ -920,65 +920,250 @@ class MainActivity : ComponentActivity() {
     fun SettingsDialog(onDismiss: () -> Unit, isEnglish: Boolean) {
         var p by remember { mutableStateOf(repository.getExportPath()) }
         var currentMode by remember { mutableStateOf(repository.getExecutionMode()) }
+        var speechEngine by remember { mutableStateOf(repository.getSpeechEngine()) }
 
         AlertDialog(
             onDismissRequest = onDismiss,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
             containerColor = MaterialTheme.colorScheme.surface,
-            title = { Text(if (isEnglish) "Settings" else "Ajustes del Sistema", color = com.example.demonitalk.ui.theme.HellRed, fontWeight = FontWeight.Black) },
-            text = {
-                Column {
-                    Text("RUTA DE EXPORTACIÓN", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.height(6.dp))
-                    androidx.compose.material3.OutlinedTextField(
-                        value = p, 
-                        onValueChange = { p = it }, 
-                        label = { Text("Ruta de Respaldos") }, 
-                        placeholder = { Text("Ej. /sdcard/Download") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.SettingsIcon,
+                        contentDescription = null,
+                        tint = com.example.demonitalk.ui.theme.HellRed,
+                        modifier = Modifier.size(26.dp)
                     )
-                    
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = if (isEnglish) "System Settings" else "Ajustes del Sistema",
+                        color = com.example.demonitalk.ui.theme.HellRed,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 18.sp
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 500.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    // SECCIÓN 1: MOTOR DE ESCUCHA (RECONOCIMIENTO DE VOZ)
+                    Text(
+                        text = if (isEnglish) "SPEECH RECOGNITION ENGINE" else "MOTOR DE ESCUCHA (RECONOCIMIENTO DE VOZ)",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(Modifier.height(6.dp))
+
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (repository.isDarkMode()) com.example.demonitalk.ui.theme.Obsidian else Color.White
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.onSurface.copy(0.12f), RoundedCornerShape(12.dp))
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            // Opción Vosk (Offline)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                androidx.compose.material3.RadioButton(
+                                    selected = (speechEngine == "VOSK"),
+                                    onClick = { speechEngine = "VOSK" }
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = "Vosk (Sin Conexión / Offline)",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (speechEngine == "VOSK") MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                        Surface(
+                                            color = Color(0xFF4CAF50).copy(0.15f),
+                                            shape = RoundedCornerShape(4.dp)
+                                        ) {
+                                            Text(
+                                                text = "📶 OFFLINE",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = Color(0xFF4CAF50),
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(
+                                        text = if (isEnglish)
+                                            "Private local speech recognition. Does not require internet."
+                                        else
+                                            "Reconocimiento local 100% privado en dispositivo. Funciona sin internet.",
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(0.7f)
+                                    )
+                                }
+                            }
+
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp), color = MaterialTheme.colorScheme.onSurface.copy(0.08f))
+
+                            // Opción Google Speech (Online)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                androidx.compose.material3.RadioButton(
+                                    selected = (speechEngine == "GOOGLE"),
+                                    onClick = { speechEngine = "GOOGLE" }
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = "Google Speech (Con Internet / Online)",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (speechEngine == "GOOGLE") MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                        Surface(
+                                            color = Color(0xFF2196F3).copy(0.15f),
+                                            shape = RoundedCornerShape(4.dp)
+                                        ) {
+                                            Text(
+                                                text = "⚡ MÁS PRECISO",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = Color(0xFF2196F3),
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(
+                                        text = if (isEnglish)
+                                            "Google cloud speech engine. Higher accuracy and fluid vocabulary. Requires internet."
+                                        else
+                                            "Motor en la nube de Google. Reconocimiento superior y dictado fluido. Requiere conexión.",
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(0.7f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     Spacer(Modifier.height(16.dp))
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(0.1f))
                     Spacer(Modifier.height(12.dp))
 
-                    Text("MODO DE EJECUCIÓN DE COMANDOS:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.height(8.dp))
-
-                    val modes = listOf(
-                        "HYBRID" to if (isEnglish) "Modo Demoníaco (Root + Accesibilidad)" else "Modo Demoníaco (Root + Accesibilidad)",
-                        "ROOT" to if (isEnglish) "Modo Root" else "Modo Root",
-                        "ACCESSIBILITY" to if (isEnglish) "Modo Accesibilidad" else "Modo Accesibilidad"
+                    // SECCIÓN 2: MODO DE EJECUCIÓN DE COMANDOS
+                    Text(
+                        text = if (isEnglish) "COMMAND EXECUTION MODE" else "MODO DE EJECUCIÓN DE COMANDOS",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        letterSpacing = 1.sp
                     )
+                    Spacer(Modifier.height(6.dp))
 
-                    modes.forEach { (modeKey, modeLabel) ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            androidx.compose.material3.RadioButton(
-                                selected = (currentMode == modeKey),
-                                onClick = { currentMode = modeKey }
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (repository.isDarkMode()) com.example.demonitalk.ui.theme.Obsidian else Color.White
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.onSurface.copy(0.12f), RoundedCornerShape(12.dp))
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            val modes = listOf(
+                                Triple("HYBRID", "Modo Demoníaco (Root + Accesibilidad)", "Híbrido recomendado. Ejecuta acciones en segundo plano con Root si está disponible, o mediante Accesibilidad."),
+                                Triple("ROOT", "Modo Root Exclusivo", "Ejecuta comandos únicamente utilizando permisos de Superusuario Root shell."),
+                                Triple("ACCESSIBILITY", "Modo Accesibilidad", "Interactúa con la pantalla mediante DemoniAccessibilityService. No requiere Root.")
                             )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = modeLabel,
-                                fontSize = 12.sp,
-                                color = if (currentMode == modeKey) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface
-                            )
+
+                            modes.forEachIndexed { index, (modeKey, modeLabel, modeDesc) ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    androidx.compose.material3.RadioButton(
+                                        selected = (currentMode == modeKey),
+                                        onClick = { currentMode = modeKey }
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = modeLabel,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (currentMode == modeKey) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = modeDesc,
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(0.7f)
+                                        )
+                                    }
+                                }
+                                if (index < modes.size - 1) {
+                                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.onSurface.copy(0.08f))
+                                }
+                            }
                         }
                     }
+
+                    Spacer(Modifier.height(16.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(0.1f))
+                    Spacer(Modifier.height(12.dp))
+
+                    // SECCIÓN 3: RESPALDOS Y RUTA
+                    Text(
+                        text = if (isEnglish) "EXPORT & BACKUP PATH" else "RUTA DE RESPALDOS Y EXPORTACIÓN",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    androidx.compose.material3.OutlinedTextField(
+                        value = p,
+                        onValueChange = { p = it },
+                        label = { Text(if (isEnglish) "Backup Path" else "Ruta de Respaldos") },
+                        placeholder = { Text("Ej. /sdcard/Download") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             },
-            confirmButton = { 
-                TextButton(onClick = { 
+            confirmButton = {
+                TextButton(onClick = {
                     repository.saveExportPath(p)
                     repository.saveExecutionMode(currentMode)
+                    repository.saveSpeechEngine(speechEngine)
                     onDismiss()
                     Toast.makeText(this@MainActivity, "Ajustes guardados correctamente 😈", Toast.LENGTH_SHORT).show()
-                }) { Text("GUARDAR", color = com.example.demonitalk.ui.theme.HellRed, fontWeight = FontWeight.Bold) } 
+                }) {
+                    Text("GUARDAR AJUSTES", color = com.example.demonitalk.ui.theme.HellRed, fontWeight = FontWeight.Bold)
+                }
             },
-            dismissButton = { TextButton(onClick = onDismiss) { Text("CANCELAR", color = AshGrey) } }
+            dismissButton = {
+                TextButton(onClick = onDismiss) {
+                    Text("CANCELAR", color = AshGrey)
+                }
+            }
         )
     }
 

@@ -21,9 +21,10 @@ import java.util.Locale
 class FloatingButtonService : Service() {
 
     private lateinit var uiManager: FloatingUiManager
-    private lateinit var speechManager: SpeechRecognitionManager
+    private lateinit var speechManager: DualSpeechManager
     private lateinit var ttsManager: TtsManager
 
+    private val offlineFallbackManager = OfflineFallbackManager()
     private lateinit var commandHandler: CommandHandler
     private lateinit var repository: CommandRepository
     private lateinit var aiAssistant: AiAssistant
@@ -150,17 +151,15 @@ class FloatingButtonService : Service() {
             }
         )
 
-        // Speech Manager con callbacks de eventos de voz
-        speechManager = SpeechRecognitionManager(
+        // Speech Manager dual (Vosk Offline / Google Speech Online)
+        speechManager = DualSpeechManager(
             context = this,
+            repository = repository,
             onReady = { updateButtonUI() },
             onSpeechResults = { text -> handleSpeechResults(text) },
             onErrorRestart = { scheduleListeningRestart(2000) },
-            onErrorStopWaiting = {
-                isWaitingForCommandAfterWake = false
-                updateButtonUI()
-            },
-            isModeActive = { isContinuousMode || isVigilanceMode }
+            isModeActive = { isContinuousMode || isVigilanceMode },
+            onPartialSpeechResults = { text -> handlePartialSpeechResults(text) }
         )
 
         // Listener de comandos internos
@@ -267,9 +266,15 @@ class FloatingButtonService : Service() {
         return false
     }
 
+    private fun isWakeWordOnly(text: String): Boolean {
+        val clean = text.lowercase(Locale.getDefault()).trim()
+        val wakeWords = listOf("demonio", "demoni", "hermano", "amigo", "maquina")
+        return wakeWords.contains(clean)
+    }
+
     private fun handleSpeechResults(text: String) {
         CoroutineScope(Dispatchers.Default).launch {
-            val lowerText = text.lowercase(Locale.getDefault())
+            val lowerText = text.lowercase(Locale.getDefault()).trim()
 
             val result = try {
                 commandHandler.execute(
@@ -283,21 +288,25 @@ class FloatingButtonService : Service() {
             }
 
             withContext(Dispatchers.Main) {
-                if (isWaitingForCommandAfterWake) {
-                    isWaitingForCommandAfterWake = false
-                    isVigilanceMode = false
-                } else if (isVigilanceMode && result == CommandHandler.CommandResult.WakeWordOnly) {
+                isWaitingForCommandAfterWake = false
+
+                if (result == CommandHandler.CommandResult.WakeWordOnly || isWakeWordOnly(lowerText)) {
                     handleWakeWordResponse()
                     return@withContext
-                } else if (result == CommandHandler.CommandResult.Ignored) {
+                }
+
+                if (result == CommandHandler.CommandResult.Ignored) {
                     val promptForAi = cleanPromptForAi(lowerText)
-                    if (promptForAi.isNotEmpty() && aiAssistant.isAiAvailable()) {
-                        processWithAiAndSpeak(promptForAi)
+                    if (promptForAi.isNotEmpty()) {
+                        if (aiAssistant.isAiAvailable()) {
+                            processWithAiAndSpeak(promptForAi)
+                            return@withContext
+                        }
+                    } else {
+                        handleWakeWordResponse()
                         return@withContext
                     }
                 }
-
-                isWaitingForCommandAfterWake = false
 
                 if (isContinuousMode || isVigilanceMode) {
                     scheduleListeningRestart(500)
@@ -308,12 +317,7 @@ class FloatingButtonService : Service() {
         }
     }
 
-    private fun CommandHandler.execute(
-        text: String,
-        commands: kotlin.collections.List<com.example.demonitalk.VoiceCommand>,
-        requireWakeWord: Boolean
-    ) {
-    }
+
 
     private fun startListening() {
         if (isServiceDestroyed) return
@@ -419,28 +423,24 @@ class FloatingButtonService : Service() {
         }
 
         CoroutineScope(Dispatchers.IO).launch {
+            // 1. Intentamos consultar la IA (si hay red)
             val aiReply = aiAssistant.askFreeAi(prompt)
 
-            if (!aiReply.isNullOrBlank()) {
-                val cleanSpeech = ttsManager.cleanTextForSpeech(aiReply)
-                val finalSpeech = if (cleanSpeech.isNotEmpty()) cleanSpeech else ""
+            // 2. 💡 AQUÍ SE USA: Si la IA falló o devolvió nulo (ej. sin internet), usamos el gestor offline
+            val finalReply = aiReply ?: offlineFallbackManager.getLocalResponse(prompt)
 
-                withContext(Dispatchers.Main) {
-                    if (finalSpeech.isNotEmpty()) {
-                        speechManager.stopListening()
-                        ttsManager.speakText(finalSpeech) {
-                            isWaitingForCommandAfterWake = false
-                            if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) {
-                                mainHandler.postDelayed({
-                                    if (!isServiceDestroyed) {
-                                        startListening()
-                                    }
-                                }, 1500)
-                            } else {
-                                updateButtonUI()
-                            }
-                        }
-                    } else {
+            val cleanSpeech = ttsManager.cleanTextForSpeech(finalReply ?: "")
+
+            val speechToSend = when {
+                cleanSpeech.isNotBlank() -> cleanSpeech
+                !finalReply.isNullOrBlank() -> finalReply
+                else -> ""
+            }
+
+            withContext(Dispatchers.Main) {
+                if (speechToSend.isNotEmpty()) {
+                    speechManager.stopListening()
+                    ttsManager.speakText(speechToSend) {
                         isWaitingForCommandAfterWake = false
                         if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) {
                             mainHandler.postDelayed({
@@ -452,13 +452,15 @@ class FloatingButtonService : Service() {
                             updateButtonUI()
                         }
                     }
-                }
-            } else {
-                Log.w("FloatingButtonService", "Sin respuesta de IA o fallo de conexión.")
-                withContext(Dispatchers.Main) {
+                } else {
+                    Log.w("FloatingButtonService", "El texto limpio y el respaldo quedaron vacíos: '$prompt'")
                     isWaitingForCommandAfterWake = false
                     if (!isServiceDestroyed && (isContinuousMode || isVigilanceMode)) {
-                        scheduleListeningRestart(500)
+                        mainHandler.postDelayed({
+                            if (!isServiceDestroyed) {
+                                scheduleListeningRestart(500)
+                            }
+                        }, 500)
                     } else {
                         updateButtonUI()
                     }

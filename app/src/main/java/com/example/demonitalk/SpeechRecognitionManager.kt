@@ -87,14 +87,22 @@ class SpeechRecognitionManager(
             originalStreamVolumes.clear()
             audioMutedByRecognizer = false
 
-            mainHandler.postDelayed({
+            val restoreRunnable = Runnable {
                 volumesToRestore.forEach { (stream, volume) ->
                     try {
-                        audioManager.setStreamVolume(stream, volume, 0)
+                        if (volume > 0) {
+                            audioManager.setStreamVolume(stream, volume, 0)
+                        }
                     } catch (_: Exception) {
                     }
                 }
-            }, 500)
+            }
+
+            if (force) {
+                restoreRunnable.run()
+            } else {
+                mainHandler.postDelayed(restoreRunnable, 200)
+            }
         } catch (e: Exception) {
             Log.d("SpeechRecManager", "Error restaurando audio de reconocimiento: ${e.message}")
         }

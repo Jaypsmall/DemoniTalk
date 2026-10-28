@@ -18,6 +18,15 @@ class CommandRepository(private val context: Context) {
     private val FREE_AI_ENGINE_ENABLED_KEY = "free_ai_engine_enabled"
     private val AI_INSTRUCTIONS_KEY = "ai_instructions"
     private val AI_MEMORY_KEY = "ai_memory"
+    private val SPEECH_ENGINE_KEY = "speech_engine"
+
+    fun saveSpeechEngine(engine: String) {
+        prefs.edit { putString(SPEECH_ENGINE_KEY, engine) }
+    }
+
+    fun getSpeechEngine(): String {
+        return prefs.getString(SPEECH_ENGINE_KEY, "VOSK") ?: "VOSK"
+    }
 
     fun saveExecutionMode(mode: String) {
         prefs.edit { putString(EXECUTION_MODE_KEY, mode) }

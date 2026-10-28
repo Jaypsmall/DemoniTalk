@@ -6,7 +6,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 
-class AiAssistant(context: Context, private val ttsManager: TtsManager?) { // <--- Añadimos el TtsManager aquí
+class AiAssistant(context: Context, private val ttsManager: TtsManager?) {
 
     private val repository = CommandRepository(context)
 
@@ -33,10 +33,6 @@ class AiAssistant(context: Context, private val ttsManager: TtsManager?) { // <-
             val resPost = fetchPollinationsPost(finalPrompt, model)
             if (!resPost.isNullOrEmpty()) {
                 Log.d("AiAssistant", "Respuesta obtenida via POST (model=$model): $resPost")
-
-                // ¡AQUÍ ESTÁ LA MAGIA! Limpiamos y reproducimos por voz automáticamente
-                speakResponse(resPost)
-
                 return resPost
             }
         }
@@ -47,10 +43,6 @@ class AiAssistant(context: Context, private val ttsManager: TtsManager?) { // <-
             val resGet = fetchPollinationsGet(finalPrompt, model)
             if (!resGet.isNullOrEmpty()) {
                 Log.d("AiAssistant", "Respuesta obtenida via GET (model=$model): $resGet")
-
-                // ¡AQUÍ TAMBIÉN!
-                speakResponse(resGet)
-
                 return resGet
             }
         }
@@ -59,28 +51,7 @@ class AiAssistant(context: Context, private val ttsManager: TtsManager?) { // <-
         return null
     }
 
-    private fun speakResponse(text: String) {
-        if (ttsManager != null) {
-            // Limpiamos reemplazando espacios raros de Unicode y caracteres invisibles
-            val safeText = text
-                .replace("\u00A0", " ") // Espacio de no separación
-                .replace(Regex("[\\p{C}\\p{Cf}]"), "") // Caracteres de control invisibles
-                .trim()
-
-            val cleanedText = ttsManager.cleanTextForSpeech(safeText).trim()
-
-            // Si la limpieza fue demasiado agresiva y quedó vacío, usamos el texto original saneado
-            val finalSpeechText = if (cleanedText.isNotEmpty()) cleanedText else safeText
-
-            Log.d("AiAssistant", "Forzando voz en altavoz para: '$finalSpeechText'")
-            ttsManager.speakText(finalSpeechText)
-        } else {
-            Log.w("AiAssistant", "TtsManager es nulo, no se puede hablar.")
-        }
-    }
-
     private fun buildPrompt(prompt: String): String {
-        // ... (tu código de buildPrompt se mantiene igual)
         val instructions = repository.getAiInstructions().trim()
         val memory = repository.getAiMemory().trim()
         return buildString {
@@ -102,10 +73,10 @@ class AiAssistant(context: Context, private val ttsManager: TtsManager?) { // <-
     }
 
     internal fun fetchPollinationsPost(prompt: String, model: String = "openai"): String? {
-        // ... (tu código fetchPollinationsPost se mantiene igual)
+        var connection: HttpURLConnection? = null
         return try {
             val url = URL("https://text.pollinations.ai/")
-            val connection = url.openConnection() as HttpURLConnection
+            connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/json")
             connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Android; Mobile)")
@@ -118,7 +89,7 @@ class AiAssistant(context: Context, private val ttsManager: TtsManager?) { // <-
                 {
                   "model": "$model",
                   "messages": [
-                    {"role": "system", "content": "Eres Demoni, asistente de voz en español. Responde directo y corto en máximo 2 frases. SIN EMOJIS."},
+                    {"role": "system", "content": "Eres Demoni, asistente de voz en español. Responde directo con ingenio y corto en máximo 2 frases. REGLAS: SIN EMOJIS, SIN PUNTOS SUSPENSIVOS."},
                     {"role": "user", "content": $escapedPrompt}
                   ]
                 }
@@ -131,8 +102,12 @@ class AiAssistant(context: Context, private val ttsManager: TtsManager?) { // <-
 
             val responseCode = connection.responseCode
             if (responseCode == 200) {
-                val responseText = connection.inputStream.bufferedReader().use { it.readText() }.trim()
+                var responseText = connection.inputStream.use { stream ->
+                    stream.bufferedReader().use { it.readText() }
+                }.trim()
+
                 if (responseText.isNotEmpty()) {
+                    // Si la respuesta viene en formato JSON, la parseamos
                     if (responseText.startsWith("{")) {
                         try {
                             val map = com.google.gson.Gson().fromJson(responseText, Map::class.java)
@@ -147,30 +122,51 @@ class AiAssistant(context: Context, private val ttsManager: TtsManager?) { // <-
                             Log.e("AiAssistant", "Error parsing POST JSON ($model): ${e.message}")
                         }
                     }
-                    return responseText
+
+                    // Si viene como texto plano rodeado de comillas, se las quitamos para evitar basura en el TTS
+                    if (responseText.startsWith("\"") && responseText.endsWith("\"") && responseText.length >= 2) {
+                        responseText = responseText.substring(1, responseText.length - 1).trim()
+                    }
+
+                    // Normalizamos saltos de línea y escapados
+                    responseText = responseText.replace("\\n", " ").replace("\\\"", "\"").trim()
+
+                    if (responseText.isNotEmpty()) {
+                        return responseText
+                    }
                 }
+            } else {
+                try {
+                    connection.errorStream?.use { it.readBytes() }
+                } catch (_: Exception) {}
             }
             null
         } catch (e: Exception) {
             null
+        } finally {
+            connection?.disconnect()
         }
     }
 
     fun fetchPollinationsGet(prompt: String, model: String = "openai"): String? {
-        // ... (tu código fetchPollinationsGet se mantiene igual)
+        var connection: HttpURLConnection? = null
         return try {
-            val systemPrompt = "Eres Demoni, asistente de voz en español. Responde en máximo 2 frases. REGLA: SIN EMOJIS."
+            val systemPrompt = "Eres Demoni, asistente de voz en español. Responde en máximo 2 frases. REGLAS: SIN EMOJIS, SIN PUNTOS SUSPENSIVOS."
             val encodedPrompt = URLEncoder.encode(prompt, "UTF-8")
             val encodedSystem = URLEncoder.encode(systemPrompt, "UTF-8")
             val urlString = "https://text.pollinations.ai/$encodedPrompt?system=$encodedSystem&model=$model"
 
-            val connection = URL(urlString).openConnection() as HttpURLConnection
+            val url = URL(urlString)
+            connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
             connection.connectTimeout = 8000
             connection.readTimeout = 10000
 
             if (connection.responseCode == 200) {
-                val responseText = connection.inputStream.bufferedReader().use { it.readText() }.trim()
+                val responseText = connection.inputStream.use { stream ->
+                    stream.bufferedReader().use { it.readText() }
+                }.trim()
+
                 if (responseText.isNotEmpty()) {
                     if (responseText.startsWith("{")) {
                         try {
@@ -186,10 +182,16 @@ class AiAssistant(context: Context, private val ttsManager: TtsManager?) { // <-
                     }
                     return responseText
                 }
+            } else {
+                try {
+                    connection.errorStream?.use { it.readBytes() }
+                } catch (_: Exception) {}
             }
             null
         } catch (e: Exception) {
             null
+        } finally {
+            connection?.disconnect()
         }
     }
 }

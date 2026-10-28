@@ -3,6 +3,7 @@ package com.example.demonitalk
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioManager
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.speech.tts.TextToSpeech
@@ -38,7 +39,7 @@ class TtsManager(private val context: Context) {
                             }
 
                             val audioAttributes = AudioAttributes.Builder()
-                                .setUsage(AudioAttributes.USAGE_ASSISTANT)
+                                .setUsage(AudioAttributes.USAGE_MEDIA)
                                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                                 .build()
                             tts?.setAudioAttributes(audioAttributes)
@@ -72,15 +73,23 @@ class TtsManager(private val context: Context) {
     }
 
     fun cleanTextForSpeech(text: String): String {
+        if (text.isBlank()) return ""
+
         return text
-            .replace(Regex("""\[CMD:.+?\]""", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("""\[REMEMBER:.+?\]""", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("""[,.;:!?¡¿"'\-\(\)\[\]]"""), " ")
+            // 1. Eliminar etiquetas internas y comandos
+            .replace(Regex("""\[CMD:.+?]""", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("""\[REMEMBER:.+?]""", RegexOption.IGNORE_CASE), "")
+            // 2. Eliminar emojis y símbolos extraños
             .replace(Regex("""[\uD83C-\uDBFF\uDC00-\uDFFF\u2600-\u27BF\u1F300-\u1F9FF]"""), "")
-            .replace(Regex("""[🚀😈🤖⚡🔥✨👍]"""), "")
-            .replace("*", "")
-            .replace("#", "")
-            .replace("_", " ")
+            .replace(Regex("""[🚀😈🤖⚡🔥✨👍•\-*#_–—]"""), " ")
+            // 3. Normalizar puntos suspensivos y comas dobles
+            .replace(Regex("""\.{2,}"""), ".")
+            .replace(Regex(""",{2,}"""), ",")
+            // 4. Cambiar punto decimal entre números (ej. 2-1 o 4.54)
+            .replace(Regex("""(\d+)\.(\d+)"""), "$1,$2")
+            // 5. Eliminar comillas para evitar conflictos en el TTS
+            .replace(Regex("""["'«»]"""), "")
+            // 6. Normalizar espacios múltiples
             .replace(Regex("""\s+"""), " ")
             .trim()
     }
@@ -96,6 +105,14 @@ class TtsManager(private val context: Context) {
         try {
             audioManager.mode = AudioManager.MODE_NORMAL
             audioManager.isSpeakerphoneOn = true
+            audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_UNMUTE, 0)
+
+            val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+            if (currentVol == 0) {
+                val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                val targetVol = if (maxVol > 0) (maxVol * 0.7f).toInt().coerceAtLeast(1) else 5
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVol, 0)
+            }
         } catch (_: Exception) {}
 
         Log.d("TtsManager", "Hablando en voz alta por altavoz: '$textToSpeak'")
@@ -117,10 +134,15 @@ class TtsManager(private val context: Context) {
 
         try {
             val utteranceId = "DemoniSpeech_${System.currentTimeMillis()}"
+            val params = Bundle().apply {
+                putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
+                putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC)
+            }
+
             val result = tts?.speak(
                 textToSpeak,
                 TextToSpeech.QUEUE_FLUSH,
-                null,
+                params,
                 utteranceId
             )
             if (result == TextToSpeech.ERROR) {
