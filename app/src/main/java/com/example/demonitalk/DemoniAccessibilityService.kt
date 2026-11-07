@@ -1356,6 +1356,79 @@ class DemoniAccessibilityService : AccessibilityService() {
     }
 
     // =========================================================
+    // SCROLL ACTIONS
+    // =========================================================
+
+    fun scrollDown(): Boolean {
+        val rootNode = rootInActiveWindow
+        if (rootNode != null) {
+            if (performNodeScroll(rootNode, AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)) {
+                rootNode.recycle()
+                return true
+            }
+            rootNode.recycle()
+        }
+
+        return try {
+            val metrics = resources.displayMetrics
+            val w = metrics.widthPixels.toFloat()
+            val h = metrics.heightPixels.toFloat()
+            val path = android.graphics.Path().apply {
+                moveTo(w / 2f, h * 0.75f)
+                lineTo(w / 2f, h * 0.25f)
+            }
+            val stroke = android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, 300)
+            val gesture = android.accessibilityservice.GestureDescription.Builder().addStroke(stroke).build()
+            dispatchGesture(gesture, null, null)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error en scrollDown gesture: ${e.message}", e)
+            false
+        }
+    }
+
+    fun scrollUp(): Boolean {
+        val rootNode = rootInActiveWindow
+        if (rootNode != null) {
+            if (performNodeScroll(rootNode, AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD)) {
+                rootNode.recycle()
+                return true
+            }
+            rootNode.recycle()
+        }
+
+        return try {
+            val metrics = resources.displayMetrics
+            val w = metrics.widthPixels.toFloat()
+            val h = metrics.heightPixels.toFloat()
+            val path = android.graphics.Path().apply {
+                moveTo(w / 2f, h * 0.25f)
+                lineTo(w / 2f, h * 0.75f)
+            }
+            val stroke = android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, 300)
+            val gesture = android.accessibilityservice.GestureDescription.Builder().addStroke(stroke).build()
+            dispatchGesture(gesture, null, null)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error en scrollUp gesture: ${e.message}", e)
+            false
+        }
+    }
+
+    private fun performNodeScroll(node: AccessibilityNodeInfo, action: Int): Boolean {
+        if (node.isScrollable && node.performAction(action)) {
+            return true
+        }
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            if (performNodeScroll(child, action)) {
+                child.recycle()
+                return true
+            }
+            child.recycle()
+        }
+        return false
+    }
+
+    // =========================================================
     // DP -> PX
     // =========================================================
 

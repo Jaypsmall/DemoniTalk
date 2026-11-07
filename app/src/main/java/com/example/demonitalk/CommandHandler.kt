@@ -74,11 +74,24 @@ class CommandHandler(private val context: Context) {
             "Texto original: '$text' -> normalizado: '$normalizedText'"
         )
 
+        // Limpiar wake word inicial si está presente (ej. "demonio inicio" -> "inicio")
+        for (wakeWord in wakeWords) {
+            if (normalizedText == wakeWord) {
+                return CommandResult.WakeWordOnly
+            }
+            if (normalizedText.startsWith("$wakeWord ")) {
+                normalizedText = normalizedText.removePrefix(wakeWord).trim()
+                wakeWordDetected = true
+                Log.d("CommandHandler", "Wake-word '$wakeWord' removido automáticamente. Comando: '$normalizedText'")
+                break
+            }
+        }
+
         // ---------------------------------------------------------
         // WAKE WORD
         // ---------------------------------------------------------
 
-        if (requireWakeWord) {
+        if (requireWakeWord && !wakeWordDetected) {
 
             val foundWakeWord = wakeWords.firstOrNull { wakeWord ->
                 normalizedText == wakeWord ||
@@ -145,20 +158,39 @@ class CommandHandler(private val context: Context) {
     }
 
     private fun findMentionedApp(text: String): String? {
-        val commonApps = listOf(
-            "whatsapp", "wasap", "telegram", "instagram", "facebook",
-            "youtube", "spotify", "tiktok", "camara", "camera",
-            "ajustes", "settings", "calculadora", "galeria", "gallery",
-            "contactos", "contacts", "telefono", "phone", "mensajes", "messages"
+        val appAliases = mapOf(
+            "whatsapp" to listOf("whatsapp", "wasap", "wasat", "guatsap", "guasa"),
+            "telegram" to listOf("telegram", "tele"),
+            "instagram" to listOf("instagram", "insta"),
+            "youtube" to listOf("youtube", "yt"),
+            "spotify" to listOf("spotify", "spot"),
+            "tiktok" to listOf("tiktok"),
+            "camara" to listOf("camara", "camera"),
+            "ajustes" to listOf("ajustes", "settings"),
+            "calculadora" to listOf("calculadora"),
+            "galeria" to listOf("galeria", "gallery"),
+            "contactos" to listOf("contactos", "contacts"),
+            "telefono" to listOf("telefono", "phone"),
+            "mensajes" to listOf("mensajes", "messages")
         )
-        for (app in commonApps) {
-            if (text.contains(app)) {
-                return if (app == "wasap") "whatsapp" else app
+
+        for ((canonical, aliases) in appAliases) {
+            for (alias in aliases) {
+                if (text.contains(alias)) {
+                    return canonical
+                }
             }
         }
         val openRegex = Regex("""\b(?:abre|abrio|abreme|abrir|abrirme|pon|lanzar)\s+(?:el\s+|la\s+|los\s+|las\s+|aplicacion\s+|app\s+)?([a-z0-9_]+)\b""")
         val match = openRegex.find(text)
-        return match?.groupValues?.get(1)
+        val rawApp = match?.groupValues?.get(1) ?: return null
+        return when (rawApp) {
+            "wasap", "wasat", "guatsap", "guasa" -> "whatsapp"
+            "insta" -> "instagram"
+            "tele" -> "telegram"
+            "yt" -> "youtube"
+            else -> rawApp
+        }
     }
 
     /**
@@ -200,6 +232,16 @@ class CommandHandler(private val context: Context) {
                 executeAsync("click_first_chat")
                 return true
             }
+        }
+
+        // ---------------------------------------------------------
+        // DETECCIÓN DIRECTA DE APLICACIÓN (ej: "whatsapp", "el whatsapp", "youtube")
+        // ---------------------------------------------------------
+        val mentionedApp = findMentionedApp(normalizedText)
+        if (mentionedApp != null) {
+            Log.d("CommandHandler", "Aplicación mencionada detectada: '$mentionedApp'")
+            executeAsync("open_app:$mentionedApp")
+            return true
         }
 
         // ---------------------------------------------------------
@@ -246,8 +288,9 @@ class CommandHandler(private val context: Context) {
         // "abrir youtube"
         // ---------------------------------------------------------
         when {
-            normalizedText.startsWith("abre ") -> {
-                val appName = extractCleanAppName(normalizedText.removePrefix("abre "))
+            normalizedText.startsWith("abre ") || normalizedText.startsWith("habra ") || normalizedText.startsWith("habre ") -> {
+                val prefix = listOf("abre ", "habra ", "habre ").first { normalizedText.startsWith(it) }
+                val appName = extractCleanAppName(normalizedText.removePrefix(prefix))
                 if (appName.isNotEmpty()) {
                     executeAsync("open_app:$appName")
                     return true
@@ -317,6 +360,26 @@ class CommandHandler(private val context: Context) {
             "primera conversacion",
             "primer contacto" -> {
                 executeAsync("click_first_chat")
+                return true
+            }
+
+            "baja",
+            "bajar",
+            "scroll abajo",
+            "desplaza abajo",
+            "baja la pagina",
+            "bajar pagina" -> {
+                executeAsync("scroll_down")
+                return true
+            }
+
+            "sube",
+            "subir",
+            "scroll arriba",
+            "desplaza arriba",
+            "sube la pagina",
+            "subir pagina" -> {
+                executeAsync("scroll_up")
                 return true
             }
 
@@ -541,8 +604,8 @@ class CommandHandler(private val context: Context) {
                     Log.d("CommandHandler", "Ejecutando paso de secuencia: '$cleanPart'")
                     executeSingleCommand(cleanPart, commands)
                     
-                    // Pausa de 1.8 segundos entre comandos para que la UI cargue
-                    try { Thread.sleep(1800) } catch (_: Exception) {}
+                    // Pausa rápida entre comandos
+                    try { Thread.sleep(400) } catch (_: Exception) {}
                 }
             }
         }.start()
@@ -589,7 +652,7 @@ class CommandHandler(private val context: Context) {
                 Thread {
                     for (sub in subActions) {
                         processAction(sub)
-                        try { Thread.sleep(1500) } catch (_: Exception) {}
+                        try { Thread.sleep(400) } catch (_: Exception) {}
                     }
                 }.start()
                 return

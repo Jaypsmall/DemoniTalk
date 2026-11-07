@@ -28,6 +28,16 @@ class VoskSpeechManager(
     private var voskModel: Model? = null
     private var speechService: SpeechService? = null
     private val gson = Gson()
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val pendingSpeechText = StringBuilder()
+    private val speechDebounceRunnable = Runnable {
+        val finalResult = pendingSpeechText.toString().trim()
+        pendingSpeechText.clear()
+        if (finalResult.isNotEmpty()) {
+            Log.i(TAG, "Vosk resultado consolidado (debounce): '$finalResult'")
+            onSpeechResults(finalResult)
+        }
+    }
 
     @Volatile
     private var isInitializing = false
@@ -116,40 +126,32 @@ class VoskSpeechManager(
     }
 
     override fun onResult(hypothesis: String?) {
-        if (hasExecutedPartialInCurrentSession) {
-            hasExecutedPartialInCurrentSession = false
-            return
-        }
-        isListening = false
         if (!hypothesis.isNullOrEmpty()) {
             val text = parseJsonText(hypothesis, "text")
             if (text.isNotEmpty()) {
-                Log.i(TAG, "Vosk reconoció: '$text'")
-                onSpeechResults(text)
-                return
+                Log.i(TAG, "Vosk fragmento reconocido: '$text'")
+                if (pendingSpeechText.isNotEmpty()) {
+                    pendingSpeechText.append(" ")
+                }
+                pendingSpeechText.append(text)
+                mainHandler.removeCallbacks(speechDebounceRunnable)
+                mainHandler.postDelayed(speechDebounceRunnable, 1200L)
             }
-        }
-        if (isModeActive()) {
-            onErrorRestart()
         }
     }
 
     override fun onFinalResult(hypothesis: String?) {
-        if (hasExecutedPartialInCurrentSession) {
-            hasExecutedPartialInCurrentSession = false
-            return
-        }
-        isListening = false
         if (!hypothesis.isNullOrEmpty()) {
             val text = parseJsonText(hypothesis, "text")
             if (text.isNotEmpty()) {
-                Log.i(TAG, "Resultado final Vosk: '$text'")
-                onSpeechResults(text)
-                return
+                Log.i(TAG, "Vosk final reconocido: '$text'")
+                if (pendingSpeechText.isNotEmpty()) {
+                    pendingSpeechText.append(" ")
+                }
+                pendingSpeechText.append(text)
+                mainHandler.removeCallbacks(speechDebounceRunnable)
+                mainHandler.postDelayed(speechDebounceRunnable, 400L)
             }
-        }
-        if (isModeActive()) {
-            onErrorRestart()
         }
     }
 
@@ -171,6 +173,8 @@ class VoskSpeechManager(
 
     fun stopListening() {
         isListening = false
+        mainHandler.removeCallbacks(speechDebounceRunnable)
+        pendingSpeechText.clear()
         try {
             speechService?.stop()
             speechService?.shutdown()
@@ -191,6 +195,7 @@ class VoskSpeechManager(
 
     fun destroy() {
         stopListening()
+        mainHandler.removeCallbacksAndMessages(null)
         try {
             voskModel?.close()
         } catch (_: Exception) {

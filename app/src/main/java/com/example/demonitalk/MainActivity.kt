@@ -269,7 +269,6 @@ class MainActivity : ComponentActivity() {
                             model = ImageRequest.Builder(context)
                                 .data("file:///android_asset/SVGs/demoni11.svg")
                                 .error(R.drawable.icono_demoni)
-                                .placeholder(R.drawable.icono_demoni)
                                 .build(),
                             imageLoader = svgImageLoader,
                             contentDescription = "Demoni SVG",
@@ -1337,9 +1336,11 @@ class MainActivity : ComponentActivity() {
         val ttsManager = remember { TtsManager(context) }
         val aiAssistant = remember { AiAssistant(context, ttsManager) }
         
+        val repository = remember { CommandRepository(context) }
         val speechManager = remember {
-            SpeechRecognitionManager(
+            DualSpeechManager(
                 context = context,
+                repository = repository,
                 onReady = { isListening = true },
                 onSpeechResults = { text ->
                     isListening = false
@@ -1354,7 +1355,6 @@ class MainActivity : ComponentActivity() {
                     }
                 },
                 onErrorRestart = { isListening = false },
-                onErrorStopWaiting = { isListening = false },
                 isModeActive = { isListening },
                 onPartialSpeechResults = { partial ->
                     spokenText = partial
@@ -1414,7 +1414,6 @@ class MainActivity : ComponentActivity() {
                             model = ImageRequest.Builder(context)
                                 .data(svgAsset)
                                 .error(R.drawable.icono_demoni)
-                                .placeholder(R.drawable.icono_demoni)
                                 .crossfade(true)
                                 .build(),
                             imageLoader = svgImageLoader,

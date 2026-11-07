@@ -110,10 +110,6 @@ class SpeechRecognitionManager(
 
     private fun setupSpeechRecognizer() {
         if (speechRecognizer != null) return
-        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
-            Log.e("SpeechRecManager", "Speech Recognition no disponible en este dispositivo")
-            return
-        }
 
         try {
             Log.i("SpeechRecManager", "Usando reconocedor de voz estándar")

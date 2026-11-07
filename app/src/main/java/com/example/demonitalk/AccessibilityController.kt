@@ -87,6 +87,8 @@ class AccessibilityController(
                 cleanAction == "global_home" -> service.performHome()
                 cleanAction == "global_recents" -> service.performRecents()
                 cleanAction == "click_first_chat" -> service.clickFirstConversation()
+                cleanAction == "scroll_down" -> service.scrollDown()
+                cleanAction == "scroll_up" -> service.scrollUp()
 
                 cleanAction.startsWith("click_text:") -> {
                     val targetText = cleanAction.removePrefix("click_text:").trim()
@@ -135,9 +137,15 @@ class AccessibilityController(
 
         val pm = context.packageManager
 
-        val searchName = name
-            .trim()
-            .lowercase(Locale.getDefault())
+        val rawName = name.trim().lowercase(Locale.getDefault())
+        val searchName = when (rawName) {
+            "wasap", "wasat", "guatsap", "guasa" -> "whatsapp"
+            "insta" -> "instagram"
+            "tele" -> "telegram"
+            "yt" -> "youtube"
+            "spot" -> "spotify"
+            else -> rawName
+        }
 
         if (searchName.isEmpty()) {
             return false
