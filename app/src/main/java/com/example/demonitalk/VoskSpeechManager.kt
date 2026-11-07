@@ -29,13 +29,13 @@ class VoskSpeechManager(
     private var speechService: SpeechService? = null
     private val gson = Gson()
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
-    private val pendingSpeechText = StringBuilder()
-    private val speechDebounceRunnable = Runnable {
-        val finalResult = pendingSpeechText.toString().trim()
-        pendingSpeechText.clear()
-        if (finalResult.isNotEmpty()) {
-            Log.i(TAG, "Vosk resultado consolidado (debounce): '$finalResult'")
-            onSpeechResults(finalResult)
+    private val accumulatedSpeech = StringBuilder()
+    private val speechTimeoutRunnable = Runnable {
+        val result = accumulatedSpeech.toString().trim()
+        accumulatedSpeech.clear()
+        if (result.isNotEmpty()) {
+            Log.i(TAG, "Vosk resultado consolidado por timeout de silencio: '$result'")
+            onSpeechResults(result)
         }
     }
 
@@ -114,14 +114,10 @@ class VoskSpeechManager(
     }
 
     override fun onPartialResult(hypothesis: String?) {
-        if (hasExecutedPartialInCurrentSession || hypothesis.isNullOrEmpty()) return
+        if (hypothesis.isNullOrEmpty()) return
         val text = parseJsonText(hypothesis, "partial")
         if (text.isNotEmpty()) {
-            if (onPartialSpeechResults?.invoke(text) == true) {
-                hasExecutedPartialInCurrentSession = true
-                isListening = false
-                stopListening()
-            }
+            onPartialSpeechResults?.invoke(text)
         }
     }
 
@@ -129,29 +125,33 @@ class VoskSpeechManager(
         if (!hypothesis.isNullOrEmpty()) {
             val text = parseJsonText(hypothesis, "text")
             if (text.isNotEmpty()) {
-                Log.i(TAG, "Vosk fragmento reconocido: '$text'")
-                if (pendingSpeechText.isNotEmpty()) {
-                    pendingSpeechText.append(" ")
+                Log.i(TAG, "Vosk chunk reconocido: '$text'")
+                if (accumulatedSpeech.isNotEmpty()) {
+                    accumulatedSpeech.append(" ")
                 }
-                pendingSpeechText.append(text)
-                mainHandler.removeCallbacks(speechDebounceRunnable)
-                mainHandler.postDelayed(speechDebounceRunnable, 1200L)
+                accumulatedSpeech.append(text)
+                mainHandler.removeCallbacks(speechTimeoutRunnable)
+                mainHandler.postDelayed(speechTimeoutRunnable, 3000L)
             }
         }
     }
 
     override fun onFinalResult(hypothesis: String?) {
-        if (!hypothesis.isNullOrEmpty()) {
-            val text = parseJsonText(hypothesis, "text")
-            if (text.isNotEmpty()) {
-                Log.i(TAG, "Vosk final reconocido: '$text'")
-                if (pendingSpeechText.isNotEmpty()) {
-                    pendingSpeechText.append(" ")
-                }
-                pendingSpeechText.append(text)
-                mainHandler.removeCallbacks(speechDebounceRunnable)
-                mainHandler.postDelayed(speechDebounceRunnable, 400L)
+        mainHandler.removeCallbacks(speechTimeoutRunnable)
+        val text = parseJsonText(hypothesis, "text")
+        if (text.isNotEmpty()) {
+            if (accumulatedSpeech.isNotEmpty()) {
+                accumulatedSpeech.append(" ")
             }
+            accumulatedSpeech.append(text)
+        }
+        val finalResult = accumulatedSpeech.toString().trim()
+        accumulatedSpeech.clear()
+        if (finalResult.isNotEmpty()) {
+            Log.i(TAG, "Vosk resultado final consolidado: '$finalResult'")
+            onSpeechResults(finalResult)
+        } else if (isModeActive()) {
+            onErrorRestart()
         }
     }
 
@@ -173,8 +173,8 @@ class VoskSpeechManager(
 
     fun stopListening() {
         isListening = false
-        mainHandler.removeCallbacks(speechDebounceRunnable)
-        pendingSpeechText.clear()
+        mainHandler.removeCallbacks(speechTimeoutRunnable)
+        accumulatedSpeech.clear()
         try {
             speechService?.stop()
             speechService?.shutdown()

@@ -95,7 +95,7 @@ class TtsManager(private val context: Context) {
     }
 
     fun speakText(textToSpeak: String, onStartCallback: (() -> Unit)? = null, onDoneCallback: (() -> Unit)? = null) {
-        val sanitized = textToSpeak.trim()
+        val sanitized = cleanTextForSpeech(textToSpeak)
         if (sanitized.isEmpty() || sanitized.all { !it.isLetterOrDigit() }) {
             Log.w("TtsManager", "Texto vacío o solo puntuación, se omite voz: '$textToSpeak'")
             onStartCallback?.invoke()
@@ -123,7 +123,7 @@ class TtsManager(private val context: Context) {
             }
         } catch (_: Exception) {}
 
-        Log.d("TtsManager", "Hablando en voz alta por altavoz: '$textToSpeak'")
+        Log.d("TtsManager", "Hablando en voz alta por altavoz: '$sanitized'")
 
         tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(id: String?) {
@@ -148,7 +148,7 @@ class TtsManager(private val context: Context) {
             }
 
             val result = tts?.speak(
-                textToSpeak,
+                sanitized,
                 TextToSpeech.QUEUE_FLUSH,
                 params,
                 utteranceId

@@ -1428,6 +1428,33 @@ class DemoniAccessibilityService : AccessibilityService() {
         return false
     }
 
+    fun dispatchTap(x: Float, y: Float): Boolean {
+        return try {
+            val path = android.graphics.Path().apply { moveTo(x, y) }
+            val stroke = android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, 50)
+            val gesture = android.accessibilityservice.GestureDescription.Builder().addStroke(stroke).build()
+            dispatchGesture(gesture, null, null)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error dispatching tap: ${e.message}", e)
+            false
+        }
+    }
+
+    fun dispatchSwipe(x1: Float, y1: Float, x2: Float, y2: Float, duration: Long = 300L): Boolean {
+        return try {
+            val path = android.graphics.Path().apply {
+                moveTo(x1, y1)
+                lineTo(x2, y2)
+            }
+            val stroke = android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, duration)
+            val gesture = android.accessibilityservice.GestureDescription.Builder().addStroke(stroke).build()
+            dispatchGesture(gesture, null, null)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error dispatching swipe: ${e.message}", e)
+            false
+        }
+    }
+
     // =========================================================
     // DP -> PX
     // =========================================================

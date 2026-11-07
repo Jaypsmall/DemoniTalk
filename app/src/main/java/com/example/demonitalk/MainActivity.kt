@@ -149,7 +149,15 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun CommandScreen(isDarkMode: Boolean, onThemeToggle: (Boolean) -> Unit) {
-        var commands by remember { mutableStateOf(repository.loadCommands()) }
+        var commands by remember { mutableStateOf<List<VoiceCommand>>(emptyList()) }
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val loaded = repository.loadCommands()
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    commands = loaded
+                }
+            }
+        }
         var showDialog by remember { mutableStateOf(false) }
         var editingCommand by remember { mutableStateOf<VoiceCommand?>(null) }
         var showSuccessDialog by remember { mutableStateOf(false) }
@@ -1337,6 +1345,7 @@ class MainActivity : ComponentActivity() {
         val aiAssistant = remember { AiAssistant(context, ttsManager) }
         
         val repository = remember { CommandRepository(context) }
+        var speechRef: DualSpeechManager? = null
         val speechManager = remember {
             DualSpeechManager(
                 context = context,
@@ -1346,11 +1355,22 @@ class MainActivity : ComponentActivity() {
                     isListening = false
                     spokenText = text
                     aiReply = "Pensando..."
+                    speechRef?.stopListening()
                     kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                         val reply = aiAssistant.askFreeAi(text) ?: ConversadorGordo.procesar(text)
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                             aiReply = reply
-                            ttsManager.speakText(reply)
+                            speechRef?.stopListening()
+                            ttsManager.speakText(
+                                reply,
+                                onStartCallback = { speechRef?.stopListening() },
+                                onDoneCallback = {
+                                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                        isListening = true
+                                        speechRef?.startListening()
+                                    }, 800L)
+                                }
+                            )
                         }
                     }
                 },
@@ -1358,9 +1378,9 @@ class MainActivity : ComponentActivity() {
                 isModeActive = { isListening },
                 onPartialSpeechResults = { partial ->
                     spokenText = partial
-                    true
+                    false
                 }
-            )
+            ).also { speechRef = it }
         }
 
         DisposableEffect(Unit) {

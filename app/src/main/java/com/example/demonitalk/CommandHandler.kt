@@ -5,7 +5,6 @@ import android.util.Log
 import java.text.Normalizer
 import java.util.Locale
 import java.util.regex.Pattern
-import kotlin.math.abs
 
 class CommandHandler(private val context: Context) {
 
@@ -56,9 +55,13 @@ class CommandHandler(private val context: Context) {
             "maquina"
         )
 
+    private var lastExecutedCommand = ""
+    private var lastExecutionTime = 0L
+
     /**
      * Procesa el texto reconocido y devuelve el resultado de la ejecución.
      */
+    @Synchronized
     fun execute(
         text: String,
         commands: List<VoiceCommand>,
@@ -66,6 +69,14 @@ class CommandHandler(private val context: Context) {
     ): CommandResult {
 
         var normalizedText = text.normalize()
+
+        val now = System.currentTimeMillis()
+        if (normalizedText == lastExecutedCommand && (now - lastExecutionTime < 1500L)) {
+            Log.d("CommandHandler", "Comando duplicado ignorado: '$normalizedText'")
+            return CommandResult.Ignored
+        }
+        lastExecutedCommand = normalizedText
+        lastExecutionTime = now
 
         var wakeWordDetected = false
 
@@ -550,9 +561,7 @@ class CommandHandler(private val context: Context) {
         // ---------------------------------------------------------
         val command = commands.firstOrNull { voiceCommand ->
             val trigger = voiceCommand.trigger.normalize()
-            normalizedText == trigger ||
-                    normalizedText.contains(trigger) ||
-                    isFuzzyMatch(normalizedText, trigger)
+            normalizedText == trigger
         }
 
         if (command != null) {
@@ -571,26 +580,6 @@ class CommandHandler(private val context: Context) {
 
         Log.d("CommandHandler", "Comando no reconocido: '$normalizedText'")
         return false
-    }
-
-    /**
-     * Coincidencia aproximada sencilla.
-     */
-    private fun isFuzzyMatch(
-        text: String,
-        trigger: String
-    ): Boolean {
-        if (text.length < 4 || trigger.length < 4) {
-            return false
-        }
-        // Si el texto completo es mucho más largo que el disparador, no es una coincidencia directa
-        if (abs(text.length - trigger.length) > 5) {
-            return false
-        }
-
-        val prefixLength = (trigger.length * 0.7).toInt().coerceAtLeast(1)
-        val prefix = trigger.substring(0, prefixLength.coerceAtMost(trigger.length))
-        return text.contains(prefix)
     }
 
     /**

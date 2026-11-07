@@ -301,6 +301,13 @@ class FloatingButtonService : Service() {
                         if (aiAssistant.isAiAvailable()) {
                             processWithAiAndSpeak(promptForAi)
                             return@withContext
+                        } else {
+                            val fallbackReply = ConversadorGordo.procesar(text)
+                            ttsManager.speakText(fallbackReply)
+                            if (isContinuousMode || isVigilanceMode) {
+                                scheduleListeningRestart(1500)
+                            }
+                            return@withContext
                         }
                     } else {
                         handleWakeWordResponse()
