@@ -12,9 +12,21 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalContext
+import coil.ImageLoader
+import coil.compose.AsyncImage
+import coil.decode.SvgDecoder
+import coil.request.ImageRequest
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +49,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
@@ -44,6 +57,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material.icons.filled.Settings as SettingsIcon
 import androidx.compose.material.icons.filled.Storage
@@ -65,6 +79,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -142,6 +157,7 @@ class MainActivity : ComponentActivity() {
         var showStorageDialog by remember { mutableStateOf(false) }
         var showAiDialog by remember { mutableStateOf(false) }
         var showHelpDialog by remember { mutableStateOf(false) }
+        var showPortalScreen by remember { mutableStateOf(false) }
         var isEnglish by remember { mutableStateOf(false) }
         
         val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -206,6 +222,38 @@ class MainActivity : ComponentActivity() {
             )) { append("Talk 😈") }
         }
 
+        var titleTapCount by remember { mutableStateOf(0) }
+        var lastTapTime by remember { mutableStateOf(0L) }
+        val context = LocalContext.current
+
+        val svgImageLoader = remember(context) {
+            ImageLoader.Builder(context)
+                .components {
+                    add(SvgDecoder.Factory())
+                }
+                .build()
+        }
+
+        val onTitleClick = {
+            val now = System.currentTimeMillis()
+            if (now - lastTapTime < 1200) {
+                titleTapCount++
+            } else {
+                titleTapCount = 1
+            }
+            lastTapTime = now
+
+            if (titleTapCount >= 5) {
+                titleTapCount = 0
+                showPortalScreen = true
+                Toast.makeText(
+                    this@MainActivity,
+                    if (isEnglish) "Demon Portal Activated! 😈" else "¡Portal Demoniaco Activado! 😈",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+
         ModalNavigationDrawer(
             drawerState = drawerState,
             drawerContent = {
@@ -217,7 +265,32 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(text = demoniTitle, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(vertical = 32.dp))
+                        AsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data("file:///android_asset/SVGs/demoni11.svg")
+                                .error(R.drawable.icono_demoni)
+                                .placeholder(R.drawable.icono_demoni)
+                                .build(),
+                            imageLoader = svgImageLoader,
+                            contentDescription = "Demoni SVG",
+                            modifier = Modifier
+                                .size(110.dp)
+                                .clickable {
+                                    onTitleClick()
+                                    scope.launch { drawerState.close() }
+                                }
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = demoniTitle,
+                            style = MaterialTheme.typography.headlineMedium,
+                            modifier = Modifier
+                                .padding(bottom = 24.dp)
+                                .clickable {
+                                    onTitleClick()
+                                    scope.launch { drawerState.close() }
+                                }
+                        )
                         HorizontalDivider(modifier = Modifier.padding(bottom = 32.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
                         
                         DrawerButton(text = if (isEnglish) "Settings" else "Ajustes", icon = Icons.Default.SettingsIcon) { showSettingsDialog = true; scope.launch { drawerState.close() } }
@@ -246,89 +319,99 @@ class MainActivity : ComponentActivity() {
                 }
             }
         ) {
-            Scaffold(
-                topBar = {
-                    Column {
-                        TopAppBar(
-                            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-                            navigationIcon = { IconButton(onClick = { scope.launch { drawerState.open() } }) { Icon(Icons.Default.Menu, "Menu") } },
-                            title = { Text(text = demoniTitle, style = MaterialTheme.typography.headlineMedium) },
-                            actions = {
-                                IconButton(onClick = { onThemeToggle(!isDarkMode) }) {
-                                    Crossfade(targetState = isDarkMode, animationSpec = tween(500)) { dark ->
-                                        Icon(if (dark) Icons.Default.DarkMode else Icons.Default.NightsStay, "Theme")
+            if (showPortalScreen) {
+                PortalScreen(isDarkMode = isDarkMode, onDismiss = { showPortalScreen = false }, isEnglish = isEnglish)
+            } else {
+                Scaffold(
+                    topBar = {
+                        Column {
+                            TopAppBar(
+                                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                                navigationIcon = { IconButton(onClick = { scope.launch { drawerState.open() } }) { Icon(Icons.Default.Menu, "Menu") } },
+                                title = {
+                                    Text(
+                                        text = demoniTitle,
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        modifier = Modifier.clickable { onTitleClick() }
+                                    )
+                                },
+                                actions = {
+                                    IconButton(onClick = { onThemeToggle(!isDarkMode) }) {
+                                        Crossfade(targetState = isDarkMode, animationSpec = tween(500)) { dark ->
+                                            Icon(if (dark) Icons.Default.DarkMode else Icons.Default.NightsStay, "Theme")
+                                        }
                                     }
                                 }
-                            }
-                        )
-                        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(Brush.horizontalGradient(listOf(Color.Transparent, Color(0xFFFF0600), Color(0xFFFFD600), Color(0xFFFF0600), Color.Transparent))))
-                    }
-                },
-                floatingActionButton = {
-                    FloatingActionButton(
-                        onClick = { showDialog = true },
-                        containerColor = com.example.demonitalk.ui.theme.HellRed,
-                        contentColor = Color.White,
-                        modifier = Modifier
-                            .shadow(16.dp, FloatingActionButtonDefaults.shape, spotColor = com.example.demonitalk.ui.theme.HellRed)
-                            .border(1.dp, Color.White.copy(0.4f), FloatingActionButtonDefaults.shape)
-                    ) { Icon(Icons.Default.Add, "Add", modifier = Modifier.size(28.dp)) }
-                },
-                floatingActionButtonPosition = FabPosition.End
-            ) { padding ->
-                Column(modifier = Modifier.padding(padding).fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp)) {
-                        Box(modifier = Modifier.weight(1f)) {
-                            DemoniButton(
-                                text = if (isEnglish) "(Accessibility)" else "(Accesibilidad)",
-                                containerColor = com.example.demonitalk.ui.theme.DemoniPurple,
-                                onClick = { checkAndOpenAccessibility() }
                             )
+                            Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(Brush.horizontalGradient(listOf(Color.Transparent, Color(0xFFFF0600), Color(0xFFFFD600), Color(0xFFFF0600), Color.Transparent))))
                         }
-                    }
-                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp)) {
-                        Box(modifier = Modifier.weight(1f)) { DemoniButton(text = if (isEnglish) "Start Floating" else "Iniciar Botón", onClick = { startFloatingService() }) }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Box(modifier = Modifier.weight(1f)) { DemoniButton(text = if (isEnglish) "Request Root" else "Solicitar Root", containerColor = MaterialTheme.colorScheme.error, onClick = { requestRoot() }) }
-                    }
+                    },
+                    floatingActionButton = {
+                        FloatingActionButton(
+                            onClick = { showDialog = true },
+                            containerColor = com.example.demonitalk.ui.theme.HellRed,
+                            contentColor = Color.White,
+                            modifier = Modifier
+                                .shadow(16.dp, FloatingActionButtonDefaults.shape, spotColor = com.example.demonitalk.ui.theme.HellRed)
+                                .border(1.dp, Color.White.copy(0.4f), FloatingActionButtonDefaults.shape)
+                        ) { Icon(Icons.Default.Add, "Add", modifier = Modifier.size(28.dp)) }
+                    },
+                    floatingActionButtonPosition = FabPosition.End
+                ) { padding ->
+                    Column(modifier = Modifier.padding(padding).fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp)) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                DemoniButton(
+                                    text = if (isEnglish) "(Accessibility)" else "(Accesibilidad)",
+                                    containerColor = com.example.demonitalk.ui.theme.DemoniPurple,
+                                    onClick = { checkAndOpenAccessibility() }
+                                )
+                            }
+                        }
+                        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp)) {
+                            Box(modifier = Modifier.weight(1f)) { DemoniButton(text = if (isEnglish) "Start Floating" else "Iniciar Botón", onClick = { startFloatingService() }) }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(modifier = Modifier.weight(1f)) { DemoniButton(text = if (isEnglish) "Request Root" else "Solicitar Root", containerColor = MaterialTheme.colorScheme.error, onClick = { requestRoot() }) }
+                        }
 
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp).border(1.dp, com.example.demonitalk.ui.theme.HellRed.copy(0.3f), RoundedCornerShape(16.dp)),
-                        colors = CardDefaults.cardColors(containerColor = if (isDarkMode) com.example.demonitalk.ui.theme.Obsidian else Color.White.copy(0.9f)),
-                        shape = RoundedCornerShape(16.dp),
-                        elevation = CardDefaults.cardElevation(4.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(text = if (isEnglish) "QUICK ACTIONS" else "ACCIONES RÁPIDAS", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.sp, modifier = Modifier.padding(bottom = 8.dp, start = 4.dp))
-                            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                ControlCircleButton(Color(0xFFFFD600)) { sendControlIntent("ACTION_MODE_YELLOW") }
-                                Spacer(modifier = Modifier.width(16.dp))
-                                ControlCircleButton(Color(0xFF2196F3)) { sendControlIntent("ACTION_MODE_BLUE") }
-                                Spacer(modifier = Modifier.width(16.dp))
-                                ControlCircleButton(Color(0xFF4CAF50)) { sendControlIntent("ACTION_MODE_GREEN") }
-                                Spacer(modifier = Modifier.weight(1f))
-                                ControlCircleButton(Color(0xFFFF0600)) { sendControlIntent("ACTION_MODE_RED") }
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp).border(1.dp, com.example.demonitalk.ui.theme.HellRed.copy(0.3f), RoundedCornerShape(16.dp)),
+                            colors = CardDefaults.cardColors(containerColor = if (isDarkMode) com.example.demonitalk.ui.theme.Obsidian else Color.White.copy(0.9f)),
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = CardDefaults.cardElevation(4.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(text = if (isEnglish) "QUICK ACTIONS" else "ACCIONES RÁPIDAS", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.sp, modifier = Modifier.padding(bottom = 8.dp, start = 4.dp))
+                                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    ControlCircleButton(Color(0xFFFFD600)) { sendControlIntent("ACTION_MODE_YELLOW") }
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    ControlCircleButton(Color(0xFF2196F3)) { sendControlIntent("ACTION_MODE_BLUE") }
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    ControlCircleButton(Color(0xFF4CAF50)) { sendControlIntent("ACTION_MODE_GREEN") }
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    ControlCircleButton(Color(0xFFFF0600)) { sendControlIntent("ACTION_MODE_RED") }
+                                }
+                            }
+                        }
+
+                        Text(text = if (isEnglish) "VOICE COMMANDS" else "COMANDOS DE VOZ", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = if (isDarkMode) AshGrey else Color.Gray, letterSpacing = 1.5.sp, modifier = Modifier.padding(start = 18.dp, top = 12.dp, bottom = 6.dp))
+
+                        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 88.dp, top = 4.dp)) {
+                            items(commands, key = { it.trigger + it.action }) { command ->
+                                CommandItem(command, isDarkMode = isDarkMode, onDelete = { commands = commands - command; repository.saveCommands(commands) }, onEdit = { editingCommand = command })
                             }
                         }
                     }
 
-                    Text(text = if (isEnglish) "VOICE COMMANDS" else "COMANDOS DE VOZ", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = if (isDarkMode) AshGrey else Color.Gray, letterSpacing = 1.5.sp, modifier = Modifier.padding(start = 18.dp, top = 12.dp, bottom = 6.dp))
-
-                    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 88.dp, top = 4.dp)) {
-                        items(commands, key = { it.trigger + it.action }) { command ->
-                            CommandItem(command, isDarkMode = isDarkMode, onDelete = { commands = commands - command; repository.saveCommands(commands) }, onEdit = { editingCommand = command })
-                        }
-                    }
+                    if (showDialog) { AddCommandDialog(onDismiss = { showDialog = false }, onAdd = { t, a, r -> val nc = VoiceCommand(t, a, r); commands = commands + nc; repository.saveCommands(commands); showDialog = false }) }
+                    editingCommand?.let { ec -> AddCommandDialog(commandToEdit = ec, onDismiss = { editingCommand = null }, onAdd = { t, a, r -> val nc = commands.toMutableList(); val i = nc.indexOf(ec); if (i != -1) { nc[i] = VoiceCommand(t, a, r); commands = nc; repository.saveCommands(commands) }; editingCommand = null }) }
+                    if (showSuccessDialog) SuccessDialog(onDismiss = { showSuccessDialog = false }, isEnglish = isEnglish)
+                    if (showSettingsDialog) SettingsDialog(onDismiss = { showSettingsDialog = false }, isEnglish = isEnglish)
+                    if (showStorageDialog) StorageDialog(onDismiss = { showStorageDialog = false }, isEnglish = isEnglish, onCommandsUpdated = { commands = it })
+                    if (showAiDialog) AiConfigDialog(onDismiss = { showAiDialog = false }, isEnglish = isEnglish)
+                    if (showHelpDialog) HelpDialog(onDismiss = { showHelpDialog = false }, isEnglish = isEnglish)
                 }
-
-                if (showDialog) { AddCommandDialog(onDismiss = { showDialog = false }, onAdd = { t, a, r -> val nc = VoiceCommand(t, a, r); commands = commands + nc; repository.saveCommands(commands); showDialog = false }) }
-                editingCommand?.let { ec -> AddCommandDialog(commandToEdit = ec, onDismiss = { editingCommand = null }, onAdd = { t, a, r -> val nc = commands.toMutableList(); val i = nc.indexOf(ec); if (i != -1) { nc[i] = VoiceCommand(t, a, r); commands = nc; repository.saveCommands(commands) }; editingCommand = null }) }
-                if (showSuccessDialog) SuccessDialog(onDismiss = { showSuccessDialog = false }, isEnglish = isEnglish)
-                if (showSettingsDialog) SettingsDialog(onDismiss = { showSettingsDialog = false }, isEnglish = isEnglish)
-                if (showStorageDialog) StorageDialog(onDismiss = { showStorageDialog = false }, isEnglish = isEnglish, onCommandsUpdated = { commands = it })
-                if (showAiDialog) AiConfigDialog(onDismiss = { showAiDialog = false }, isEnglish = isEnglish)
-                if (showHelpDialog) HelpDialog(onDismiss = { showHelpDialog = false }, isEnglish = isEnglish)
             }
         }
     }
@@ -1235,5 +1318,244 @@ class MainActivity : ComponentActivity() {
             return settingValue?.contains(service) == true
         }
         return false
+    }
+
+    @Composable
+    fun PortalScreen(isDarkMode: Boolean, onDismiss: () -> Unit, isEnglish: Boolean) {
+        var isListening by remember { mutableStateOf(false) }
+        var spokenText by remember { mutableStateOf(if (isEnglish) "Listening to your commands..." else "Escuchando al Demonio...") }
+        var aiReply by remember { mutableStateOf(if (isEnglish) "Portal open. Speak to Demoni." else "Portal abierto. Habla con el Demonio...") }
+        
+        val context = LocalContext.current
+        val svgImageLoader = remember(context) {
+            ImageLoader.Builder(context)
+                .components {
+                    add(SvgDecoder.Factory())
+                }
+                .build()
+        }
+        val ttsManager = remember { TtsManager(context) }
+        val aiAssistant = remember { AiAssistant(context, ttsManager) }
+        
+        val speechManager = remember {
+            SpeechRecognitionManager(
+                context = context,
+                onReady = { isListening = true },
+                onSpeechResults = { text ->
+                    isListening = false
+                    spokenText = text
+                    aiReply = "Pensando..."
+                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                        val reply = aiAssistant.askFreeAi(text) ?: ConversadorGordo.procesar(text)
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            aiReply = reply
+                            ttsManager.speakText(reply)
+                        }
+                    }
+                },
+                onErrorRestart = { isListening = false },
+                onErrorStopWaiting = { isListening = false },
+                isModeActive = { isListening },
+                onPartialSpeechResults = { partial ->
+                    spokenText = partial
+                    true
+                }
+            )
+        }
+
+        DisposableEffect(Unit) {
+            onDispose {
+                speechManager.destroy()
+                ttsManager.destroy()
+            }
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Title: DemoniTalk Pro 😈
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "DemoniTalk Pro ",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Black,
+                        color = com.example.demonitalk.ui.theme.HellRed
+                    )
+                    Text(text = "😈", fontSize = 24.sp)
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Character Card with glowing border
+                Card(
+                    modifier = Modifier
+                        .size(240.dp)
+                        .border(2.dp, Brush.linearGradient(listOf(com.example.demonitalk.ui.theme.HellRed, com.example.demonitalk.ui.theme.BrimstoneYellow, com.example.demonitalk.ui.theme.DemoniPurple)), RoundedCornerShape(24.dp)),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = com.example.demonitalk.ui.theme.Obsidian)
+                ) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        val svgAsset = when {
+                            isListening -> "file:///android_asset/SVGs/demoni22.svg"
+                            aiReply == "Pensando..." -> "file:///android_asset/SVGs/demoni33.svg"
+                            else -> "file:///android_asset/SVGs/demoni44.svg"
+                        }
+                        AsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data(svgAsset)
+                                .error(R.drawable.icono_demoni)
+                                .placeholder(R.drawable.icono_demoni)
+                                .crossfade(true)
+                                .build(),
+                            imageLoader = svgImageLoader,
+                            contentDescription = "Demoni Character SVG",
+                            modifier = Modifier.size(210.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Tacógrafo de Audio Infernal (Audio Wave Visualizer Card)
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, com.example.demonitalk.ui.theme.BrimstoneYellow.copy(0.5f), RoundedCornerShape(16.dp)),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = com.example.demonitalk.ui.theme.Obsidian)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Mic, contentDescription = null, tint = com.example.demonitalk.ui.theme.BrimstoneYellow, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = "TACÓGRAFO DE AUDIO INFERNAL",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = com.example.demonitalk.ui.theme.BrimstoneYellow,
+                                letterSpacing = 1.sp
+                            )
+                        }
+                        
+                        Spacer(Modifier.height(16.dp))
+
+                        // Animated Audio Wave Bars
+                        val infiniteTransition = rememberInfiniteTransition(label = "wave")
+                        Row(
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val barColors = listOf(com.example.demonitalk.ui.theme.BrimstoneYellow, com.example.demonitalk.ui.theme.HellRed, com.example.demonitalk.ui.theme.DemoniPurple, Color.Cyan, Color.Green, Color.Magenta, com.example.demonitalk.ui.theme.BrimstoneYellow, com.example.demonitalk.ui.theme.HellRed)
+                            barColors.forEachIndexed { index, color ->
+                                val animatedHeight by infiniteTransition.animateFloat(
+                                    initialValue = 10f,
+                                    targetValue = if (isListening) (20f + (index * 7f) % 35f) else 14f,
+                                    animationSpec = infiniteRepeatable(
+                                        animation = tween(durationMillis = 300 + index * 50, easing = LinearEasing),
+                                        repeatMode = RepeatMode.Reverse
+                                    ),
+                                    label = "bar_$index"
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .width(5.dp)
+                                        .height(animatedHeight.dp)
+                                        .background(color, CircleShape)
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            text = spokenText,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color.White,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = aiReply,
+                            fontSize = 11.sp,
+                            color = AshGrey,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // HABLAR AL DEMONIO Button
+                Button(
+                    onClick = {
+                        if (isListening) {
+                            speechManager.stopListening()
+                            isListening = false
+                        } else {
+                            spokenText = "Escuchando..."
+                            speechManager.startListening()
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .shadow(12.dp, RoundedCornerShape(16.dp), spotColor = com.example.demonitalk.ui.theme.DemoniPurple),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = com.example.demonitalk.ui.theme.DemoniPurple)
+                ) {
+                    Icon(Icons.Default.Mic, contentDescription = null, tint = Color.White)
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = if (isListening) "ESCUCHANDO AL DEMONIO..." else "HABLAR AL DEMONIO (ESCUCHA DIRECTA)",
+                        fontWeight = FontWeight.Black,
+                        fontSize = 12.sp,
+                        color = Color.White,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // CERRAR PORTAL Button
+                OutlinedButton(
+                    onClick = {
+                        speechManager.stopListening()
+                        ttsManager.destroy()
+                        onDismiss()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.5.dp, com.example.demonitalk.ui.theme.HellRed),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = com.example.demonitalk.ui.theme.HellRed)
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = null, tint = com.example.demonitalk.ui.theme.HellRed)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "CERRAR PORTAL (VOLVER A COMANDOS)",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
     }
 }

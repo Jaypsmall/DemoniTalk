@@ -95,6 +95,14 @@ class TtsManager(private val context: Context) {
     }
 
     fun speakText(textToSpeak: String, onStartCallback: (() -> Unit)? = null, onDoneCallback: (() -> Unit)? = null) {
+        val sanitized = textToSpeak.trim()
+        if (sanitized.isEmpty() || sanitized.all { !it.isLetterOrDigit() }) {
+            Log.w("TtsManager", "Texto vacío o solo puntuación, se omite voz: '$textToSpeak'")
+            onStartCallback?.invoke()
+            onDoneCallback?.invoke()
+            return
+        }
+
         if (!isTtsReady || tts == null) {
             Log.w("TtsManager", "TTS aún no está listo. Encolando texto: '$textToSpeak'")
             pendingSpeechQueue.add(Triple(textToSpeak, onStartCallback, onDoneCallback))
