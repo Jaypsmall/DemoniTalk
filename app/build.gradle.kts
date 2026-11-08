@@ -33,9 +33,9 @@ android {
     buildFeatures {
         compose = true
     }
-    sourceSets {
-        getByName("main") {
-            assets.directories.add("../assets")
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
         }
     }
 }
