@@ -20,8 +20,8 @@
 ---
 
 <p align="center">
-  <img src="https://github.com/Jaypsmall/DemoniTalk/raw/master-v2/assets/1.png" width="49%" />
-  <img src="https://github.com/Jaypsmall/DemoniTalk/raw/master-v2/assets/2.png" width="49%" />
+  <img src="https://github.com/Jaypsmall/DemoniTalk/raw/master-v2/assets/1.png" width="30%" />
+  <img src="https://github.com/Jaypsmall/DemoniTalk/raw/master-v2/assets/2.png" width="30%" />
 </p>
 
 ---
@@ -48,8 +48,8 @@
 ---
 
 <p align="center">
-  <img src="https://github.com/Jaypsmall/DemoniTalk/raw/master-v2/assets/4.png" width="49%" />
-  <img src="https://github.com/Jaypsmall/DemoniTalk/raw/master-v2/assets/5.png" width="49%" />  
+  <img src="https://github.com/Jaypsmall/DemoniTalk/raw/master-v2/assets/4.png" width="30%" />
+  <img src="https://github.com/Jaypsmall/DemoniTalk/raw/master-v2/assets/5.png" width="30%" />  
 </p>
 
 ---
